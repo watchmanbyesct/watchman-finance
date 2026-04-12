@@ -1,10 +1,6 @@
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 
-/**
- * Supabase client for use inside Server Components, Server Actions,
- * and Route Handlers. Uses the anon key + cookie-based session.
- */
 export function createSupabaseServerClient() {
   const cookieStore = cookies();
   return createServerClient(
@@ -12,11 +8,11 @@ export function createSupabaseServerClient() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get(name) { return cookieStore.get(name)?.value; },
-        set(name, value, options) {
+        get(name: string) { return cookieStore.get(name)?.value; },
+        set(name: string, value: string, options: CookieOptions) {
           try { cookieStore.set({ name, value, ...options }); } catch {}
         },
-        remove(name, options) {
+        remove(name: string, options: CookieOptions) {
           try { cookieStore.set({ name, value: "", ...options }); } catch {}
         },
       },
@@ -24,12 +20,6 @@ export function createSupabaseServerClient() {
   );
 }
 
-/**
- * Supabase admin client using the service role key.
- * ONLY for server-side finance mutations that bypass RLS intentionally
- * (e.g., posting journal entries, payroll finalization, period close).
- * Never expose this client to the browser.
- */
 export function createSupabaseAdminClient() {
   const { createClient } = require("@supabase/supabase-js");
   return createClient(
