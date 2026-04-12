@@ -1,12 +1,15 @@
 import {
-  TrendingUp, TrendingDown, AlertCircle, CheckCircle2,
+  TrendingUp, AlertCircle, CheckCircle2,
   ArrowRight, Clock, DollarSign, Users, FileText,
 } from "lucide-react";
 import Link from "next/link";
+import { WATCHMAN_DEPLOYED_MIGRATION_PACK } from "@/lib/constants/watchman-migrations";
 
 export const metadata = { title: "Dashboard — Watchman Finance" };
 
-// Placeholder stat cards — wired to real data once Pack 001 is migrated
+const PACK = WATCHMAN_DEPLOYED_MIGRATION_PACK;
+
+// Placeholder stat cards — replace with live queries when reporting is wired
 const STATS = [
   {
     label: "AR Balance",
@@ -43,16 +46,44 @@ const STATS = [
 ];
 
 const SETUP_CHECKLIST = [
-  { label: "Pack 001 — Foundation schema applied",     complete: false, href: null },
-  { label: "EST Holdings tenant created",               complete: false, href: null },
-  { label: "ESCT entity created",                       complete: false, href: null },
-  { label: "Chart of accounts seeded",                  complete: false, href: "/finance/accounts" },
-  { label: "First fiscal period created",               complete: false, href: "/finance/periods" },
-  { label: "First customer added",                      complete: false, href: "/finance/ar/customers" },
-  { label: "First vendor added",                        complete: false, href: "/finance/ap/vendors" },
-  { label: "Employee pay profiles configured",          complete: false, href: "/finance/payroll/profiles" },
-  { label: "Bank account linked",                       complete: false, href: "/finance/banking/accounts" },
-  { label: "First payroll run created",                 complete: false, href: "/finance/payroll/runs" },
+  { label: "Pack 001 — Foundation (GL, org, audit)", complete: PACK >= 1, href: null },
+  { label: "Pack 002 — Integration staging", complete: PACK >= 2, href: null },
+  { label: "Pack 003 — AR & AP core", complete: PACK >= 3, href: null },
+  { label: "Pack 004 — Payroll core", complete: PACK >= 4, href: null },
+  { label: "Pack 005 — Leave & accruals", complete: PACK >= 5, href: null },
+  { label: "Pack 006 — Banking & reconciliation", complete: PACK >= 6, href: null },
+  { label: "Pack 007 — Catalog & billing", complete: PACK >= 7, href: null },
+  { label: "Pack 008 — Inventory & assets", complete: PACK >= 8, href: null },
+  { label: "Pack 009 — Reporting & close", complete: PACK >= 9, href: null },
+  { label: "Pack 010 — Budgeting & forecasting", complete: PACK >= 10, href: null },
+  { label: "Pack 011 — Consolidation & commercial", complete: PACK >= 11, href: null },
+  { label: "Pack 012 — Hardening & QA", complete: PACK >= 12, href: null },
+  { label: "EST Holdings tenant created", complete: false, href: null },
+  { label: "ESCT entity created", complete: false, href: null },
+  { label: "Chart of accounts seeded", complete: false, href: "/finance/accounts" },
+  { label: "First fiscal period created", complete: false, href: "/finance/periods" },
+  { label: "First customer added", complete: false, href: "/finance/ar/customers" },
+  { label: "First vendor added", complete: false, href: "/finance/ap/vendors" },
+  { label: "Employee pay profiles configured", complete: false, href: "/finance/payroll/profiles" },
+  { label: "Bank account linked", complete: false, href: "/finance/banking/accounts" },
+  { label: "First payroll run created", complete: false, href: "/finance/payroll/runs" },
+];
+
+const MODULE_SCHEMA_STATUS: { name: string; ready: boolean }[] = [
+  { name: "Finance Core", ready: PACK >= 1 },
+  { name: "Integration", ready: PACK >= 2 },
+  { name: "AR", ready: PACK >= 3 },
+  { name: "AP", ready: PACK >= 3 },
+  { name: "Payroll", ready: PACK >= 4 },
+  { name: "Leave", ready: PACK >= 5 },
+  { name: "Banking", ready: PACK >= 6 },
+  { name: "Catalog", ready: PACK >= 7 },
+  { name: "Billing", ready: PACK >= 7 },
+  { name: "Inventory", ready: PACK >= 8 },
+  { name: "Reporting", ready: PACK >= 9 },
+  { name: "Budgeting & forecasting", ready: PACK >= 10 },
+  { name: "Consolidation", ready: PACK >= 11 },
+  { name: "Operations & QA", ready: PACK >= 12 },
 ];
 
 const QUICK_LINKS = [
@@ -68,6 +99,8 @@ export default function FinanceDashboardPage() {
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
+  const checklistDone = SETUP_CHECKLIST.filter((i) => i.complete).length;
+  const packLabel = String(WATCHMAN_DEPLOYED_MIGRATION_PACK).padStart(3, "0");
 
   return (
     <div className="max-w-6xl space-y-8">
@@ -79,9 +112,9 @@ export default function FinanceDashboardPage() {
           <p className="text-sm text-neutral-500 mt-1">{today} &mdash; EST Holdings / ESCT</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="wf-badge wf-badge-warning">
-            <Clock size={10} className="mr-1" />
-            Setup in Progress
+          <span className="wf-badge wf-badge-success">
+            <CheckCircle2 size={10} className="mr-1" />
+            Packs 001–{packLabel} applied
           </span>
         </div>
       </div>
@@ -110,7 +143,7 @@ export default function FinanceDashboardPage() {
           <div className="flex items-center justify-between mb-4">
             <h2 className="wf-section-title">Platform Setup Checklist</h2>
             <span className="text-xs text-neutral-500">
-              0 / {SETUP_CHECKLIST.length} complete
+              {checklistDone} / {SETUP_CHECKLIST.length} complete
             </span>
           </div>
 
@@ -178,16 +211,14 @@ export default function FinanceDashboardPage() {
           <div className="wf-card-gold">
             <h2 className="wf-section-title mb-3">Module Status</h2>
             <div className="space-y-2">
-              {[
-                "Finance Core", "AR", "AP", "Payroll", "Leave",
-                "Banking", "Catalog", "Billing", "Inventory",
-                "Reporting", "Budgeting", "Forecasting",
-              ].map((mod) => (
-                <div key={mod} className="flex items-center justify-between">
-                  <span className="text-xs text-neutral-400">{mod}</span>
-                  <span className="wf-badge wf-badge-warning text-[10px] py-0.5">
-                    Pending Schema
-                  </span>
+              {MODULE_SCHEMA_STATUS.map(({ name, ready }) => (
+                <div key={name} className="flex items-center justify-between gap-2">
+                  <span className="text-xs text-neutral-400">{name}</span>
+                  {ready ? (
+                    <span className="wf-badge wf-badge-success text-[10px] py-0.5">Schema live</span>
+                  ) : (
+                    <span className="wf-badge wf-badge-warning text-[10px] py-0.5">Migration pending</span>
+                  )}
                 </div>
               ))}
             </div>
@@ -195,18 +226,18 @@ export default function FinanceDashboardPage() {
         </div>
       </div>
 
-      {/* Migration notice */}
-      <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 px-5 py-4 flex items-start gap-3">
-        <AlertCircle size={16} className="text-amber-400 flex-shrink-0 mt-0.5" />
+      {/* Next steps */}
+      <div className="rounded-lg border border-white/10 bg-white/[0.03] px-5 py-4 flex items-start gap-3">
+        <Clock size={16} className="text-neutral-500 flex-shrink-0 mt-0.5" />
         <div>
-          <p className="text-sm font-medium text-amber-300">Migration Required</p>
-          <p className="text-sm text-neutral-400 mt-1">
-            Run the Pack 001 migration against your Supabase project before using any finance workflows.
-            Once migrated and bootstrapped, this dashboard will populate with live data.
+          <p className="text-sm font-medium text-neutral-200">Operational next steps</p>
+          <p className="text-sm text-neutral-500 mt-1">
+            SQL through Pack {packLabel} is reflected in the UI. Finish the checklist (tenant, COA, master
+            data) and connect each workspace to server actions as workflows mature. Bump{" "}
+            <code className="text-xs text-neutral-400">WATCHMAN_DEPLOYED_MIGRATION_PACK</code> in{" "}
+            <code className="text-xs text-neutral-400">lib/constants/watchman-migrations.ts</code> whenever
+            you apply additional packs so module banners stay accurate.
           </p>
-          <code className="block mt-2 text-xs bg-black/40 border border-white/10 rounded px-3 py-2 text-amber-300 font-mono">
-            npx supabase db push --project-ref YOUR_PROJECT_REF
-          </code>
         </div>
       </div>
     </div>

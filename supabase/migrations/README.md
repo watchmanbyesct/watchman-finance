@@ -50,11 +50,28 @@ After running Pack 001, verify in the Supabase Dashboard:
 - [ ] `tenant_memberships` table exists
 - [ ] `roles` table exists and seeded
 - [ ] `permissions` table exists and seeded
+- [ ] `role_permissions` links tenant admin roles to permissions (bootstrap Step 8b)
+- [ ] `user_entity_scopes` grants entity access where required (bootstrap seeds default entity)
 - [ ] `tenant_module_entitlements` table exists
 - [ ] `account_categories` table exists and seeded
 - [ ] `accounts` table exists
 - [ ] `fiscal_periods` table exists
+- [ ] `fiscal_period_closures` table exists (used when closing periods)
 - [ ] `audit_logs` table exists
 - [ ] RLS is enabled and cross-tenant access is blocked
 
 Do not continue to Pack 002 until Pack 001 passes all checks.
+
+## Validation Checklist (Pack 002)
+
+After `002_watchman_finance_integration_staging.sql`:
+
+- [ ] `integration_systems` seeded (Launch, Operations, Finance, QuickBooks)
+- [ ] `staged_employees`, `staged_time_entries`, and related staging tables exist
+- [ ] `finance_people` exists (depends on `branches` / `departments` / `locations` stubs in the same migration)
+- [ ] `public.has_active_tenant_membership` and `public.has_entity_scope` exist (used by RLS policies)
+- [ ] API routes `POST /api/integrations/launch/employees` and `POST /api/integrations/operations/approved-time` succeed against staging tables
+
+### Already applied Pack 001 manually?
+
+If the database existed before this repo gained `001_watchman_finance_foundation.sql`, diff your live schema against that file, then run `npm run greenfield:bootstrap` again (idempotent) to backfill `user_entity_scopes`, `role_permissions`, and the `user.scope_assign` permission where missing.

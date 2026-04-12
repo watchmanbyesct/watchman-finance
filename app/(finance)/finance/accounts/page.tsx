@@ -1,3 +1,5 @@
+import { ModuleWorkspaceStatus } from "@/components/finance/module-workspace-status";
+
 export const metadata = { title: "Chart of Accounts — Watchman Finance" };
 
 export default function Page() {
@@ -9,13 +11,8 @@ export default function Page() {
           Module: General Ledger &mdash; Pack 001
         </p>
       </div>
-      <div className="wf-card border-amber-500/20 bg-amber-500/5">
-        <p className="text-sm text-amber-300 font-medium mb-1">Not yet active</p>
-        <p className="text-sm text-neutral-400">
-          This module will be available after the required migration pack is applied
-          and seeded. Build this screen in the sprint for General Ledger.
-        </p>
-      </div>
+      <ModuleWorkspaceStatus packNumber={1} workspaceName="General Ledger" />
+
     </div>
   );
 }

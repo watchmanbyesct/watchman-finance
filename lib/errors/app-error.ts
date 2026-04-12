@@ -29,8 +29,10 @@ export interface ActionResult<T = undefined> {
 /**
  * Maps a thrown error into a structured ActionResult.
  * All server actions should catch and route through this.
+ * `T` matches the action's success `data` shape so catch paths type-check
+ * (failure results omit `data`).
  */
-export function mapErrorToResult(err: unknown): ActionResult {
+export function mapErrorToResult<T = undefined>(err: unknown): ActionResult<T> {
   const message = err instanceof Error ? err.message : "internal_error";
 
   if (message.startsWith("forbidden:")) {

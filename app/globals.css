@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+/* Fonts: loaded via next/font/google on <html> (--font-display, --font-body, --font-mono). */
 
 :root {
   /* Brand */
@@ -38,10 +38,7 @@
   --border-default: rgba(255,255,255,0.10);
   --border-gold:    rgba(245,158,11,0.30);
 
-  /* Fonts */
-  --font-display: 'Playfair Display', Georgia, serif;
-  --font-body:    'DM Sans', system-ui, sans-serif;
-  --font-mono:    'DM Mono', 'Courier New', monospace;
+  /* --font-display / --font-body / --font-mono: set on <html> by next/font in app/layout.tsx (do not redefine here). */
 }
 
 * {
@@ -50,17 +47,23 @@
   margin: 0;
 }
 
+html {
+  /* Fallback until next/font variables hydrate */
+  font-family: system-ui, -apple-system, Segoe UI, sans-serif;
+}
+
 html, body {
   max-width: 100vw;
   overflow-x: hidden;
   background-color: var(--onyx-900);
   color: var(--text-primary);
-  font-family: var(--font-body);
   font-size: 14px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Body gets DM Sans from next/font className on <body> in layout.tsx */
 
 /* Scrollbar */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -163,7 +166,7 @@ html, body {
   }
 
   .wf-table tbody tr:hover td {
-    @apply bg-white/3;
+    @apply bg-white/5;
   }
 
   .wf-section-title {
@@ -171,12 +174,11 @@ html, body {
   }
 
   .wf-page-title {
-    font-family: var(--font-display);
-    @apply text-2xl font-semibold text-neutral-50;
+    @apply font-display text-2xl font-semibold text-neutral-50;
   }
 
   .wf-divider {
-    @apply border-t border-white/8 my-5;
+    @apply border-t border-white/10 my-5;
   }
 
   .wf-stat {

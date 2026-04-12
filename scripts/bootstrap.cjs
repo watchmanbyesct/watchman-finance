@@ -15,13 +15,14 @@
  *   4. Create the platform_user record
  *   5. Create the EST Holdings tenant
  *   6. Create the ESCT entity under the tenant
- *   7. Create the tenant membership for the admin user
+ *   7. Create the tenant membership for the admin user + default user_entity_scope
  *   8. Seed system roles
- *   9. Seed system permissions
+ *   9. Seed system permissions, then link tenant_owner to all permissions (role_permissions)
  *  10. Assign tenant_owner role to the bootstrap user
  *  11. Seed module entitlements (all modules enabled for ESCT)
  *  12. Seed account categories
- *  13. Print summary and next steps
+ *  13. Write bootstrap audit record
+ *  14. Print summary and next steps
  *
  * Requirements:
  *   - .env.local must exist with NEXT_PUBLIC_SUPABASE_URL and
@@ -109,15 +110,18 @@ const SYSTEM_PERMISSIONS = [
   "ar.payment.apply",
   "ap.bill.create", "ap.bill.approve", "ap.payment.release",
   "payroll.run.create", "payroll.run.calculate", "payroll.run.approve",
-  "payroll.run.finalize", "payroll.ach.generate",
-  "leave.policy.manage", "leave.request.approve",
-  "banking.account.manage", "banking.reconciliation.close",
+  "payroll.run.finalize", "payroll.profile.manage", "payroll.ach.generate",
+  "leave.policy.manage", "leave.request.create", "leave.request.approve", "leave.accrual.run",
+  "banking.account.manage", "banking.transaction.import",
+  "banking.reconciliation.create", "banking.reconciliation.approve", "banking.reconciliation.close",
+  "banking.transfer.create", "banking.transfer.approve",
   "tax.profile.manage", "tax.liability.record",
   "inventory.item.manage", "inventory.adjustment.post",
   "report.read_standard", "report.read_executive",
   "audit.read",
-  "user.role_assign", "user.invite",
+  "user.role_assign", "user.scope_assign", "user.invite",
   "module.entitlement.manage",
+  "integration.staging.promote",
 ];
 
 const MODULE_KEYS = [
@@ -307,6 +311,18 @@ async function main() {
   if (memberError) fatal("Failed to create membership: " + memberError.message);
   log("Tenant membership confirmed.");
 
+  // Default entity scope so GL / entity-scoped actions work without a separate grant
+  const { error: scopeError } = await admin.from("user_entity_scopes").upsert(
+    {
+      tenant_id: tenantId,
+      platform_user_id: platformUserId,
+      entity_id: entityId,
+    },
+    { onConflict: "tenant_id,platform_user_id,entity_id" }
+  );
+  if (scopeError) log("  WARNING: user_entity_scopes upsert: " + scopeError.message);
+  else log("Default user_entity_scope granted for ESCT.");
+
   // ── Step 7: Seed roles ────────────────────────────────────────────────────
   section("Step 7. Seeding system roles");
   for (const role of SYSTEM_ROLES) {
@@ -328,6 +344,31 @@ async function main() {
     if (error) log(`  WARNING: permission seed failed for ${perm}: ${error.message}`);
   }
   log(`${SYSTEM_PERMISSIONS.length} permissions seeded.`);
+
+  // ── Step 8b: Grant tenant_owner every permission (role_permissions) ───────
+  section("Step 8b. Linking tenant_owner role to all permissions");
+  const { data: ownerRoleForPerms } = await admin
+    .from("roles")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("code", "tenant_owner")
+    .single();
+
+  const { data: permRows } = await admin.from("permissions").select("id");
+  if (ownerRoleForPerms && permRows?.length) {
+    let linked = 0;
+    for (const p of permRows) {
+      const { error: rpError } = await admin.from("role_permissions").upsert(
+        { role_id: ownerRoleForPerms.id, permission_id: p.id },
+        { onConflict: "role_id,permission_id" }
+      );
+      if (!rpError) linked++;
+      else log(`  WARNING: role_permission ${p.id}: ${rpError.message}`);
+    }
+    log(`role_permissions rows linked: ${linked}.`);
+  } else {
+    log("  WARNING: could not seed role_permissions (missing role or permissions).");
+  }
 
   // ── Step 9: Assign tenant_owner role ─────────────────────────────────────
   section("Step 9. Assigning tenant_owner role to bootstrap admin");

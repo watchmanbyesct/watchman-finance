@@ -37,7 +37,7 @@ export async function resolveRequestContext(
   // Verify active tenant membership
   const { data: membership } = await supabase
     .from("tenant_memberships")
-    .select("membership_status")
+    .select("membership_status, default_entity_id")
     .eq("tenant_id", tenantId)
     .eq("platform_user_id", platformUser.id)
     .single();
@@ -46,7 +46,7 @@ export async function resolveRequestContext(
     throw new Error("context_error:not_a_member_of_tenant");
   }
 
-  // Resolve entity scopes
+  // Resolve entity scopes (explicit grants; default entity still counts for Pack 001 UX)
   const { data: entityScopes } = await supabase
     .from("user_entity_scopes")
     .select("entity_id")
@@ -76,12 +76,19 @@ export async function resolveRequestContext(
     .eq("tenant_id", tenantId)
     .eq("is_enabled", true);
 
+  const entityIdSet = new Set<string>(
+    (entityScopes ?? []).map((s: { entity_id: string }) => s.entity_id)
+  );
+  if (membership.default_entity_id) {
+    entityIdSet.add(membership.default_entity_id);
+  }
+
   return {
     platformUserId: platformUser.id,
     email: session.email,
     tenantId,
-    entityIds: (entityScopes ?? []).map((s: any) => s.entity_id),
+    entityIds: [...entityIdSet],
     permissions: [...new Set(permissions)],
-    moduleEntitlements: (entitlementRows ?? []).map((e: any) => e.module_key),
+    moduleEntitlements: (entitlementRows ?? []).map((e: { module_key: string }) => e.module_key),
   };
 }

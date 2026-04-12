@@ -14,10 +14,7 @@ export default function LoginPage() {
           <p className="text-xs uppercase tracking-[0.25em] text-amber-500 font-medium mb-2">
             Watchman Ecosystem
           </p>
-          <h1
-            className="text-3xl font-semibold text-neutral-50"
-            style={{ fontFamily: "var(--font-display)" }}
-          >
+          <h1 className="font-display text-3xl font-semibold text-neutral-50">
             Finance
           </h1>
           <p className="mt-2 text-sm text-neutral-500">

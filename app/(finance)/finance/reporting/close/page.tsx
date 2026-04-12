@@ -1,3 +1,5 @@
+import { ModuleWorkspaceStatus } from "@/components/finance/module-workspace-status";
+
 export const metadata = { title: "Close Mgmt — Watchman Finance" };
 
 export default function Page() {
@@ -9,13 +11,8 @@ export default function Page() {
           Module: Reporting &mdash; Pack 009
         </p>
       </div>
-      <div className="wf-card border-amber-500/20 bg-amber-500/5">
-        <p className="text-sm text-amber-300 font-medium mb-1">Not yet active</p>
-        <p className="text-sm text-neutral-400">
-          This module will be available after the required migration pack is applied
-          and seeded. Build this screen in the sprint for Reporting.
-        </p>
-      </div>
+      <ModuleWorkspaceStatus packNumber={9} workspaceName="Reporting" />
+
     </div>
   );
 }

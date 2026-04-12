@@ -6,7 +6,7 @@ import {
   LayoutDashboard, BookOpen, Users, Building2, FileText,
   Receipt, CreditCard, Wallet, Briefcase, CalendarClock,
   Landmark, Package, Tag, Zap, BarChart3, TrendingUp,
-  ShieldCheck, Settings, ChevronRight,
+  ShieldCheck, Settings, ChevronRight, Layers, Activity,
 } from "lucide-react";
 
 interface NavItem {
@@ -82,6 +82,14 @@ const NAV: NavGroup[] = [
       { label: "Dashboards", href: "/finance/reporting/dashboards",  icon: LayoutDashboard },
       { label: "Budgets",    href: "/finance/planning/budgets",      icon: TrendingUp },
       { label: "Forecasts",  href: "/finance/planning/forecasts",    icon: TrendingUp },
+    ],
+  },
+  {
+    title: "Structure",
+    items: [
+      { label: "Consolidation", href: "/finance/consolidation/groups", icon: Layers },
+      { label: "Releases",      href: "/finance/operations/releases", icon: Activity },
+      { label: "System health", href: "/finance/operations/health",   icon: ShieldCheck },
     ],
   },
   {
