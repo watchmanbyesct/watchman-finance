@@ -8,8 +8,17 @@ const PUBLIC_PATHS = [
   "/api/integrations/quickbooks/webhook",
 ];
 
+/** Public files under /public (logos, icons) must not require session — image requests are separate from the page. */
+function isPublicStaticPath(pathname: string): boolean {
+  if (pathname.startsWith("/branding/")) return true;
+  return /\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2?)$/i.test(pathname);
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  if (isPublicStaticPath(pathname)) {
+    return NextResponse.next();
+  }
   if (PUBLIC_PATHS.some((p) => pathname.startsWith(p))) {
     return NextResponse.next();
   }
