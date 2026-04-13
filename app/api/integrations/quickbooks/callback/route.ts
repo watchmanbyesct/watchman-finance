@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthSession } from "@/lib/auth/resolve-session";
 import { getOptionalFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
-import { exchangeQboAuthorizationCode, fetchQboCompanyName } from "@/lib/integrations/qbo-oauth";
+import {
+  exchangeQboAuthorizationCode,
+  fetchQboCompanyName,
+  resolveQboRedirectUri,
+} from "@/lib/integrations/qbo-oauth";
 import { consumeQboOAuthState, upsertQboCredentials } from "@/lib/integrations/qbo-persistence";
 
 function redirectToFinance(req: NextRequest, path: string) {
@@ -21,9 +25,9 @@ export async function GET(req: NextRequest) {
     return redirectToFinance(req, "/login?redirectTo=/finance/integration/quickbooks");
   }
 
-  const redirectUri = process.env.QBO_REDIRECT_URI;
+  const redirectUri = resolveQboRedirectUri(req.nextUrl.origin);
   if (!redirectUri) {
-    return redirectToFinance(req, "/finance/integration/quickbooks?error=qbo_env");
+    return redirectToFinance(req, "/finance/integration/quickbooks?error=qbo_redirect_uri_missing");
   }
 
   const url = req.nextUrl;
@@ -51,9 +55,10 @@ export async function GET(req: NextRequest) {
 
   const exchanged = await exchangeQboAuthorizationCode(code, redirectUri);
   if (!exchanged.ok) {
+    const safe = exchanged.error.slice(0, 450);
     return redirectToFinance(
       req,
-      `/finance/integration/quickbooks?error=${encodeURIComponent(exchanged.error)}`
+      `/finance/integration/quickbooks?error=${encodeURIComponent(safe)}`
     );
   }
 
@@ -73,7 +78,7 @@ export async function GET(req: NextRequest) {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "persist_failed";
-    return redirectToFinance(req, `/finance/integration/quickbooks?error=${encodeURIComponent(msg)}`);
+    return redirectToFinance(req, `/finance/integration/quickbooks?error=${encodeURIComponent(msg.slice(0, 450))}`);
   }
 
   return redirectToFinance(req, "/finance/integration/quickbooks?connected=1");

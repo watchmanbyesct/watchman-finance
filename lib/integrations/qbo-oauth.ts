@@ -6,17 +6,32 @@
 const INTUIT_AUTH_BASE = "https://appcenter.intuit.com/connect/oauth2";
 const INTUIT_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens";
 
+const CALLBACK_PATH = "/api/integrations/quickbooks/callback";
+
+/**
+ * OAuth redirect_uri must match exactly what Intuit shows in the app and what is sent on authorize + token.
+ * If `QBO_REDIRECT_URI` is unset and `QBO_REDIRECT_USE_REQUEST_ORIGIN=1`, derive `{origin}{CALLBACK_PATH}` (useful for preview URLs).
+ */
+export function resolveQboRedirectUri(requestOrigin: string): string | null {
+  const explicit = process.env.QBO_REDIRECT_URI?.trim();
+  if (explicit) return explicit;
+  if (process.env.QBO_REDIRECT_USE_REQUEST_ORIGIN === "1") {
+    const origin = requestOrigin.replace(/\/$/, "");
+    return `${origin}${CALLBACK_PATH}`;
+  }
+  return null;
+}
+
 export function getQboApiBase(): string {
   return process.env.QBO_ENVIRONMENT === "production"
     ? "https://quickbooks.api.intuit.com"
     : "https://sandbox-quickbooks.api.intuit.com";
 }
 
-export function buildQboAuthorizationUrl(state: string): string {
+export function buildQboAuthorizationUrl(state: string, redirectUri: string): string {
   const clientId = process.env.QBO_CLIENT_ID;
-  const redirectUri = process.env.QBO_REDIRECT_URI;
-  if (!clientId || !redirectUri) {
-    throw new Error("QBO_CLIENT_ID and QBO_REDIRECT_URI must be set.");
+  if (!clientId) {
+    throw new Error("QBO_CLIENT_ID must be set.");
   }
   const params = new URLSearchParams({
     client_id: clientId,
@@ -68,7 +83,13 @@ export async function exchangeQboAuthorizationCode(
   try {
     json = JSON.parse(text) as Record<string, unknown>;
   } catch {
-    return { ok: false, error: "Invalid token response from Intuit.", status: 502 };
+    console.error("[qbo:token] non-JSON response", { status: res.status, bodyHead: text.slice(0, 800) });
+    const snippet = text.replace(/\s+/g, " ").trim().slice(0, 80);
+    return {
+      ok: false,
+      error: `Intuit token HTTP ${res.status} (not JSON). Check client id/secret; redirect URI must match Intuit app and Connect host. Logs show body prefix. Snippet: ${snippet || "(empty)"}`,
+      status: res.status || 502,
+    };
   }
 
   if (!res.ok) {

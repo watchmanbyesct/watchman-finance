@@ -12,7 +12,15 @@ export default async function Page({
 }) {
   const workspace = await resolveFinanceWorkspace();
   const connected = searchParams.connected === "1";
-  const err = typeof searchParams.error === "string" ? searchParams.error : undefined;
+  const errRaw = typeof searchParams.error === "string" ? searchParams.error : undefined;
+  let err: string | undefined;
+  if (errRaw) {
+    try {
+      err = decodeURIComponent(errRaw);
+    } catch {
+      err = errRaw;
+    }
+  }
 
   let qbo: Awaited<ReturnType<typeof getQboConnectionSummary>> = null;
   if (workspace) {
@@ -78,6 +86,22 @@ export default async function Page({
                 : "/api/integrations/quickbooks/webhook"}
             </code>
           </p>
+          <div className="rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-neutral-500 space-y-1.5">
+            <p className="font-medium text-neutral-400">If token exchange fails</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>
+                <code className="text-neutral-400">QBO_REDIRECT_URI</code> must be identical on authorize and token
+                calls and listed in Intuit (scheme, host, path, no trailing slash unless you always use one).
+              </li>
+              <li>
+                Vercel <span className="text-neutral-400 font-medium">preview</span> URLs differ per deploy; either register
+                that exact callback in Intuit or set <code className="text-neutral-400">QBO_REDIRECT_USE_REQUEST_ORIGIN=1</code>{" "}
+                and omit <code className="text-neutral-400">QBO_REDIRECT_URI</code> so the callback follows the host you
+                used to open Connect.
+              </li>
+              <li>Confirm development vs production keys match <code className="text-neutral-400">QBO_ENVIRONMENT</code>.</li>
+            </ul>
+          </div>
         </div>
 
         {qbo ? (

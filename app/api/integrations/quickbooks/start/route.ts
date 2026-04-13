@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { getAuthSession } from "@/lib/auth/resolve-session";
 import { getOptionalFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
-import { buildQboAuthorizationUrl } from "@/lib/integrations/qbo-oauth";
+import { buildQboAuthorizationUrl, resolveQboRedirectUri } from "@/lib/integrations/qbo-oauth";
 import { insertQboOAuthState, pruneExpiredQboOAuthStates } from "@/lib/integrations/qbo-persistence";
 import { createSupabaseServerClient } from "@/lib/db/supabase-server";
 
@@ -10,7 +10,7 @@ import { createSupabaseServerClient } from "@/lib/db/supabase-server";
  * GET /api/integrations/quickbooks/start
  * Authenticated user — stores CSRF state and redirects to Intuit OAuth.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
   const session = await getAuthSession();
   if (!session) {
     return NextResponse.json({ error: "sign_in_required" }, { status: 401 });
@@ -33,10 +33,17 @@ export async function GET() {
   }
 
   try {
+    const redirectUri = resolveQboRedirectUri(req.nextUrl.origin);
+    if (!redirectUri) {
+      return NextResponse.json(
+        { error: "Set QBO_REDIRECT_URI or QBO_REDIRECT_USE_REQUEST_ORIGIN=1 (and register that URI in Intuit)." },
+        { status: 500 }
+      );
+    }
     await pruneExpiredQboOAuthStates();
     const state = randomBytes(24).toString("hex");
     await insertQboOAuthState(state, workspace.tenantId, pu.id);
-    const url = buildQboAuthorizationUrl(state);
+    const url = buildQboAuthorizationUrl(state, redirectUri);
     return NextResponse.redirect(url);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "oauth_start_failed";
