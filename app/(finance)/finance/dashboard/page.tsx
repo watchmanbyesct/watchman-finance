@@ -111,21 +111,11 @@ const SETUP_CHECKLIST: SetupChecklistItem[] = [
     complete: PACK >= 23,
     href: "/finance/evidence",
   },
-  {
-    label: "ESCT Holdings tenant created",
-    complete: false,
-    href: null,
-    pendingNote: "Migrations + bootstrap",
-    pendingTitle:
-      "Apply Watchman Finance SQL packs (Pack 001 onward) to Supabase, then run npm run greenfield:bootstrap to create the ESCT Holdings tenant.",
-  },
+  { label: "ESCT Holdings tenant created", complete: true, href: null },
   {
     label: "ESCT entity — Enterprise Security Consulting and Training Inc.",
-    complete: false,
+    complete: true,
     href: null,
-    pendingNote: "Migrations + bootstrap",
-    pendingTitle:
-      "Apply SQL migrations through Pack 001+, then run npm run greenfield:bootstrap to create the ESCT entity (Enterprise Security Consulting and Training Inc.) under ESCT Holdings.",
   },
   { label: "Chart of accounts seeded", complete: false, href: "/finance/accounts" },
   { label: "First fiscal period created", complete: false, href: "/finance/periods" },
