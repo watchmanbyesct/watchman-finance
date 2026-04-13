@@ -6,7 +6,8 @@
 update public.integration_systems
 set
   system_key = 'external_accounting_oauth',
-  display_name = 'External accounting (OAuth)'
+  name = 'External accounting (OAuth)',
+  updated_at = timezone('utc', now())
 where system_key = 'quickbooks_online';
 
 -- OAuth state + credentials (service_role only)
