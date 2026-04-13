@@ -140,19 +140,8 @@ const MODULE_KEYS = [
   "reporting", "planning", "consolidation", "operations", "tax",
 ];
 
-const ACCOUNT_CATEGORIES = [
-  { code: "assets_current",      name: "Current Assets",          category_type: "asset",     normal_balance: "debit"  },
-  { code: "assets_fixed",        name: "Fixed Assets",            category_type: "asset",     normal_balance: "debit"  },
-  { code: "liabilities_current", name: "Current Liabilities",     category_type: "liability", normal_balance: "credit" },
-  { code: "liabilities_lt",      name: "Long-Term Liabilities",   category_type: "liability", normal_balance: "credit" },
-  { code: "equity",              name: "Equity",                  category_type: "equity",    normal_balance: "credit" },
-  { code: "revenue",             name: "Revenue",                 category_type: "revenue",   normal_balance: "credit" },
-  { code: "cogs",                name: "Cost of Goods Sold",      category_type: "expense",   normal_balance: "debit"  },
-  { code: "operating_expense",   name: "Operating Expenses",      category_type: "expense",   normal_balance: "debit"  },
-  { code: "payroll_expense",     name: "Payroll Expenses",        category_type: "expense",   normal_balance: "debit"  },
-  { code: "other_income",        name: "Other Income",            category_type: "revenue",   normal_balance: "credit" },
-  { code: "other_expense",       name: "Other Expenses",          category_type: "expense",   normal_balance: "debit"  },
-];
+const ACCOUNT_CATEGORY_SEED_PATH = path.join(__dirname, "..", "lib", "finance", "data", "account-category-seed.json");
+const ACCOUNT_CATEGORIES = JSON.parse(fs.readFileSync(ACCOUNT_CATEGORY_SEED_PATH, "utf8"));
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 async function main() {
@@ -413,7 +402,16 @@ async function main() {
   section("Step 11. Seeding account categories");
   for (const cat of ACCOUNT_CATEGORIES) {
     const { error } = await admin.from("account_categories").upsert(
-      { tenant_id: tenantId, code: cat.code, name: cat.name, category_type: cat.category_type, normal_balance: cat.normal_balance, status: "active" },
+      {
+        tenant_id: tenantId,
+        code: cat.code,
+        name: cat.name,
+        category_type: cat.category_type,
+        normal_balance: cat.normal_balance,
+        qbd_account_type: cat.qbd_account_type,
+        status: "active",
+        updated_at: new Date().toISOString(),
+      },
       { onConflict: "tenant_id,code" }
     );
     if (error) log(`  WARNING: account category seed failed for ${cat.code}: ${error.message}`);

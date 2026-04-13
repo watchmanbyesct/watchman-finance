@@ -6,6 +6,7 @@ import { resolveRequestContext } from "@/lib/context/resolve-request-context";
 import { requirePermission, requireEntityScope } from "@/lib/permissions/require-permission";
 import { writeAuditLog } from "@/lib/audit/write-audit-log";
 import { mapErrorToResult, type ActionResult } from "@/lib/errors/app-error";
+import { ACCOUNT_CATEGORY_SEED_ROWS } from "@/lib/finance/account-category-seed";
 import {
   QBD_ACCOUNT_TYPE_VALUES,
   SOURCE_OF_TRUTH_VALUES,
@@ -29,8 +30,15 @@ const CreateAccountSchema = z.object({
   accountCategoryId: z.string().uuid(),
   code:              z.string().min(1).max(50),
   name:              z.string().min(1).max(255),
-  accountType:       z.string().min(1),
-  normalBalance:     z.enum(["debit", "credit"]),
+  /** Deprecated: GL type and normal balance are taken from the category (QBD model). */
+  accountType: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : v),
+    z.string().min(1).optional()
+  ),
+  normalBalance: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : v),
+    z.enum(["debit", "credit"]).optional()
+  ),
   allowPosting: z.preprocess((v) => {
     if (v === undefined || v === null || v === "") return true;
     if (v === false || v === "false") return false;
@@ -73,6 +81,44 @@ const SeedFiscalPeriodsSchema = z.object({
 
 const SourceOfTruthZ = z.enum(SOURCE_OF_TRUTH_VALUES as unknown as [string, ...string[]]);
 const QbdAccountTypeZ = z.enum(QBD_ACCOUNT_TYPE_VALUES as unknown as [string, ...string[]]);
+
+const SeedQbdAccountCategoriesSchema = z.object({
+  tenantId: z.string().uuid(),
+});
+
+const CreateAccountCategorySchema = z.object({
+  tenantId: z.string().uuid(),
+  code: z
+    .string()
+    .min(1)
+    .max(80)
+    .transform((s) => s.trim().toLowerCase())
+    .refine((s) => /^[a-z][a-z0-9_]*$/.test(s), {
+      message: "Use lowercase letters, numbers, and underscores (start with a letter).",
+    }),
+  name: z.string().min(1).max(255).transform((s) => s.trim()),
+  categoryType: z.enum(["asset", "liability", "equity", "revenue", "expense"]),
+  normalBalance: z.enum(["debit", "credit"]),
+  qbdAccountType: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : v),
+    QbdAccountTypeZ.optional()
+  ),
+});
+
+function defaultQbdForGlCategoryType(glType: string): string {
+  switch (glType) {
+    case "asset":
+      return "other_current_asset";
+    case "liability":
+      return "other_current_liability";
+    case "equity":
+      return "equity";
+    case "revenue":
+      return "income";
+    default:
+      return "expense";
+  }
+}
 
 const UpdateAccountSchema = z.object({
   tenantId:        z.string().uuid(),
@@ -185,16 +231,28 @@ export async function createAccount(
     requireEntityScope(ctx, input.entityId);
 
     const admin = createSupabaseAdminClient();
+
+    const { data: catRow, error: catErr } = await admin
+      .from("account_categories")
+      .select("id, category_type, normal_balance, qbd_account_type")
+      .eq("id", input.accountCategoryId)
+      .eq("tenant_id", input.tenantId)
+      .maybeSingle();
+
+    if (catErr) throw new Error(catErr.message);
+    if (!catRow) {
+      return {
+        success: false,
+        message: "Account category not found for this tenant. Seed QBD categories or create a custom category.",
+      };
+    }
+
+    const accountType = String(catRow.category_type);
+    const normalBalance = String(catRow.normal_balance) as "debit" | "credit";
     const qbdAccountType =
-      input.accountType === "asset"
-        ? "other_current_asset"
-        : input.accountType === "liability"
-          ? "other_current_liability"
-          : input.accountType === "equity"
-            ? "equity"
-            : input.accountType === "revenue"
-              ? "income"
-              : "expense";
+      catRow.qbd_account_type != null && String(catRow.qbd_account_type).length > 0
+        ? String(catRow.qbd_account_type)
+        : defaultQbdForGlCategoryType(accountType);
 
     // Unique code per entity
     const { data: existing } = await admin
@@ -220,10 +278,10 @@ export async function createAccount(
         account_category_id: input.accountCategoryId,
         code:                input.code,
         name:                input.name,
-        account_type:        input.accountType,
+        account_type:        accountType,
         qbd_account_type:    qbdAccountType,
         source_of_truth:     "gl_manual",
-        normal_balance:      input.normalBalance,
+        normal_balance:      normalBalance,
         allow_posting:       input.allowPosting,
         parent_account_id:   input.parentAccountId ?? null,
         description:         input.description ?? null,
@@ -313,7 +371,7 @@ export async function seedChartOfAccounts(
     const { data: categories, error: catError } = await admin
       .from("account_categories")
       .select("id, code")
-      .or(`tenant_id.eq.${input.tenantId},tenant_id.is.null`)
+      .eq("tenant_id", input.tenantId)
       .eq("status", "active");
 
     if (catError) throw new Error(catError.message);
@@ -367,6 +425,118 @@ export async function seedChartOfAccounts(
       success: true,
       message: `Seeded ${DEFAULT_COA_TEMPLATES.length} chart of accounts rows (upserted).`,
       data: { seededCount: DEFAULT_COA_TEMPLATES.length },
+    };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+/**
+ * Upsert QuickBooks Desktop–style account categories for the tenant.
+ * Permission: gl.account.manage
+ */
+export async function seedQbdAccountCategories(
+  input: z.infer<typeof SeedQbdAccountCategoriesSchema>
+): Promise<ActionResult<{ seededCount: number }>> {
+  try {
+    const v = SeedQbdAccountCategoriesSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requirePermission(ctx, "gl.account.manage");
+
+    const admin = createSupabaseAdminClient();
+    const now = new Date().toISOString();
+    const rows = ACCOUNT_CATEGORY_SEED_ROWS.map((r) => ({
+      tenant_id: v.tenantId,
+      code: r.code,
+      name: r.name,
+      category_type: r.category_type,
+      normal_balance: r.normal_balance,
+      qbd_account_type: r.qbd_account_type,
+      status: "active",
+      updated_at: now,
+    }));
+
+    const { error } = await admin.from("account_categories").upsert(rows, { onConflict: "tenant_id,code" });
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: null,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "finance_core",
+      actionCode: "gl.account_category.seed_qbd",
+      targetTable: "account_categories",
+      newValues: { seededCount: rows.length },
+    });
+
+    revalidatePath("/finance/accounts");
+    return {
+      success: true,
+      message: `Seeded ${rows.length} QBD-style account categories (upserted).`,
+      data: { seededCount: rows.length },
+    };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+/**
+ * Create a tenant-specific account category (custom COA grouping).
+ * Permission: gl.account.manage
+ */
+export async function createAccountCategory(
+  input: z.infer<typeof CreateAccountCategorySchema>
+): Promise<ActionResult<{ accountCategoryId: string }>> {
+  try {
+    const parsed = CreateAccountCategorySchema.parse(input);
+    const ctx = await resolveRequestContext(parsed.tenantId);
+    requirePermission(ctx, "gl.account.manage");
+
+    const admin = createSupabaseAdminClient();
+    const qbd =
+      parsed.qbdAccountType ?? defaultQbdForGlCategoryType(parsed.categoryType);
+
+    const { data: row, error } = await admin
+      .from("account_categories")
+      .insert({
+        tenant_id: parsed.tenantId,
+        code: parsed.code,
+        name: parsed.name,
+        category_type: parsed.categoryType,
+        normal_balance: parsed.normalBalance,
+        qbd_account_type: qbd,
+        status: "active",
+      })
+      .select("id")
+      .single();
+
+    if (error) {
+      if (error.code === "23505") {
+        return {
+          success: false,
+          message: `Category code ${parsed.code} already exists for this tenant.`,
+          errors: [{ code: "conflict", message: "account_category_code_conflict" }],
+        };
+      }
+      throw new Error(error.message);
+    }
+
+    await writeAuditLog({
+      tenantId: parsed.tenantId,
+      entityId: null,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "finance_core",
+      actionCode: "gl.account_category.create",
+      targetTable: "account_categories",
+      targetRecordId: row.id,
+      newValues: { code: parsed.code, categoryType: parsed.categoryType, qbdAccountType: qbd },
+    });
+
+    revalidatePath("/finance/accounts");
+    return {
+      success: true,
+      message: `Category ${parsed.name} created.`,
+      data: { accountCategoryId: row.id },
     };
   } catch (err) {
     return mapErrorToResult(err);

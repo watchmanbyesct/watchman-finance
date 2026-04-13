@@ -73,9 +73,10 @@ export async function getAccountCategories(tenantId: string) {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("account_categories")
-    .select("id, code, name, category_type, normal_balance, status")
-    .or(`tenant_id.eq.${tenantId},tenant_id.is.null`)
+    .select("id, code, name, category_type, normal_balance, qbd_account_type, status")
+    .eq("tenant_id", tenantId)
     .eq("status", "active")
+    .order("category_type")
     .order("name");
 
   if (error) throw new Error(error.message);

@@ -4,6 +4,10 @@ import { getAccountsByEntity, getAccountCategories } from "@/modules/finance-cor
 import { GlWorkspaceBanner } from "@/components/finance/gl/gl-workspace-banner";
 import { GlSetupRequired } from "@/components/finance/gl/gl-setup-required";
 import { AccountCreateForm } from "@/components/finance/gl/account-create-form";
+import {
+  CreateAccountCategoryForm,
+  QbdAccountCategorySeedButton,
+} from "@/components/finance/gl/account-category-forms";
 import { AccountsTable } from "@/components/finance/gl/accounts-table";
 import { AccountSeedButton } from "@/components/finance/gl/account-seed-button";
 
@@ -56,10 +60,9 @@ export default async function Page() {
       ) : (
         <>
           <AccountSeedButton tenantId={workspace.tenantId} entityId={workspace.entityId} />
-          <AccountCreateForm
-            workspace={workspace}
-            categories={categories as { id: string; code: string; name: string }[]}
-          />
+          <QbdAccountCategorySeedButton workspace={workspace} />
+          <CreateAccountCategoryForm workspace={workspace} />
+          <AccountCreateForm workspace={workspace} categories={categories} />
 
           <div>
             <h2 className="text-sm font-medium text-neutral-300 mb-3">Accounts</h2>

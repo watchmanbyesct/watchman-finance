@@ -8,6 +8,7 @@ import { createVendor } from "@/modules/ap/actions/ap-actions";
 import {
   seedChartOfAccounts,
   seedFiscalPeriods,
+  seedQbdAccountCategories,
 } from "@/modules/finance-core/actions/finance-core-actions";
 import {
   createPayGroup,
@@ -61,6 +62,9 @@ export async function seedAllPlatformWorkflows(
     const push = (key: string, success: boolean, message: string) => {
       steps.push({ key, success, message });
     };
+
+    const qbdCats = await seedQbdAccountCategories({ tenantId: parsed.tenantId });
+    push("account_categories_qbd", qbdCats.success, qbdCats.message);
 
     const coa = await seedChartOfAccounts({
       tenantId: parsed.tenantId,
