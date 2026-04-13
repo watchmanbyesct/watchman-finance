@@ -5,6 +5,7 @@ import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace
 export const metadata = { title: "Pack 002 — Integration — Watchman Finance" };
 
 const LINKS = [
+  { href: "/finance/integration/quickbooks", label: "QuickBooks Online (OAuth)" },
   { href: "/finance/integration/staging/employees", label: "Staging — Employees (Launch)" },
   { href: "/finance/integration/staging/time", label: "Staging — Approved time (Operations)" },
   { href: "/finance/integration/staging/service-events", label: "Staging — Service events" },

@@ -111,6 +111,11 @@ const SETUP_CHECKLIST: SetupChecklistItem[] = [
     complete: PACK >= 23,
     href: "/finance/evidence",
   },
+  {
+    label: "Pack 024 — QuickBooks Online OAuth (Pack 002 extension)",
+    complete: PACK >= 24,
+    href: "/finance/integration/quickbooks",
+  },
   { label: "ESCT Holdings tenant created", complete: true, href: null },
   {
     label: "ESCT entity — Enterprise Security Consulting and Training Inc.",
@@ -147,6 +152,7 @@ const MODULE_SCHEMA_STATUS: { name: string; ready: boolean }[] = [
   { name: "Subledger GL & reporting automation", ready: PACK >= 17 },
   { name: "GL reversals & AP subledger", ready: PACK >= 18 },
   { name: "Evidence, approvals, TB cache & integration diagnostics", ready: PACK >= 23 },
+  { name: "QuickBooks Online OAuth (Pack 002)", ready: PACK >= 24 },
 ];
 
 const QUICK_LINKS = [

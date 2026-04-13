@@ -28,6 +28,7 @@ Run all migrations in strict sequence. Do not skip or reorder.
 021_watchman_finance_trial_balance_snapshots.sql
 022_watchman_finance_api_idempotency_webhooks.sql
 023_watchman_finance_workflow_permissions_019_022.sql
+024_watchman_finance_qbo_oauth_pack002.sql
 ```
 
 ## How to Run

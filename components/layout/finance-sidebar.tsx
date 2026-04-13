@@ -11,7 +11,7 @@ import {
   LayoutGrid, DollarSign, Scale, Sparkles, AlertTriangle, Gauge, GitCompare,
   GitBranch, Link2, Flag, Rocket, UserCircle, FileCode, PieChart,
   Beaker, PlayCircle, ListChecks, Bell, Cpu, BookMarked, Database, RotateCcw, Mountain,
-  Percent, FileCheck2, ClipboardCheck, Radio,
+  Percent, FileCheck2, ClipboardCheck, Radio, Calculator,
 } from "lucide-react";
 
 interface NavItem {
@@ -38,6 +38,7 @@ const NAV: NavGroup[] = [
     title: "Integration (Pack 002)",
     items: [
       { label: "Pack 002 overview", href: "/finance/integration", icon: Plug },
+      { label: "QuickBooks Online", href: "/finance/integration/quickbooks", icon: Calculator },
       { label: "Staging — Employees", href: "/finance/integration/staging/employees", icon: Users },
       { label: "Staging — Time", href: "/finance/integration/staging/time", icon: CalendarClock },
       { label: "Staging — Service events", href: "/finance/integration/staging/service-events", icon: Zap },

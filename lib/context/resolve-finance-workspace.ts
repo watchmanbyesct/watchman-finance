@@ -1,5 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/db/supabase-server";
-import { requireAuthSession } from "@/lib/auth/resolve-session";
+import { getAuthSession, requireAuthSession } from "@/lib/auth/resolve-session";
 
 export interface FinanceWorkspace {
   tenantId: string;
@@ -10,12 +10,13 @@ export interface FinanceWorkspace {
 }
 
 /**
- * Resolves the active tenant + entity for finance GL screens.
+ * Resolves the active tenant + entity without redirecting when there is no session.
  * Uses the first active membership (by join date) and default_entity_id when set;
  * otherwise the first entity for that tenant (by code).
  */
-export async function resolveFinanceWorkspace(): Promise<FinanceWorkspace | null> {
-  const session = await requireAuthSession();
+export async function getOptionalFinanceWorkspace(): Promise<FinanceWorkspace | null> {
+  const session = await getAuthSession();
+  if (!session) return null;
   const supabase = createSupabaseServerClient();
 
   const { data: platformUser, error: puErr } = await supabase
@@ -83,4 +84,10 @@ export async function resolveFinanceWorkspace(): Promise<FinanceWorkspace | null
     entityCode: firstEntity.code,
     entityDisplayName: firstEntity.display_name,
   };
+}
+
+/** Resolves workspace for finance screens; redirects to /login when unauthenticated. */
+export async function resolveFinanceWorkspace(): Promise<FinanceWorkspace | null> {
+  await requireAuthSession();
+  return getOptionalFinanceWorkspace();
 }

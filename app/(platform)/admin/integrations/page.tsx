@@ -32,6 +32,11 @@ export default function Page() {
               API idempotency & webhook delivery log (Pack 022)
             </Link>
           </li>
+          <li>
+            <Link href="/finance/integration/quickbooks" className="text-amber-500 hover:text-amber-400">
+              QuickBooks Online — OAuth (Pack 002 / 024)
+            </Link>
+          </li>
         </ul>
       </div>
     </AdminSubpage>
