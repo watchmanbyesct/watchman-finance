@@ -4,15 +4,19 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { FinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import {
+  applyDesktopPayrollComponents,
   approvePayrollRun,
+  assignEmployeePayrollItem,
   calculatePayrollRun,
   createPayGroup,
+  createPayrollItemCatalog,
   createPayPeriod,
   createEmployeePayProfile,
   createPayrollRun,
   finalizePayrollRun,
   loadApprovedTimeIntoPayrollRun,
   reversePayrollRun,
+  seedPayrollDesktopItemCatalog,
   seedEmployeePayProfiles,
 } from "@/modules/payroll/actions/payroll-actions";
 
@@ -22,6 +26,8 @@ const input =
 type PayGroupRow = { id: string; group_code: string; group_name: string };
 type PayPeriodRow = { id: string; period_name: string; pay_group_id: string };
 type PersonRow = { id: string; legal_first_name: string; legal_last_name: string };
+type PayrollItemRow = { id: string; item_code: string; item_name: string };
+type EmployeePayProfilePickRow = { id: string; employee_number: string | null; finance_person_id: string };
 
 export function PayGroupCreateForm({ workspace }: { workspace: FinanceWorkspace }) {
   const router = useRouter();
@@ -580,6 +586,289 @@ export function PayrollRunLifecycleForm({
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+export function PayrollDesktopCatalogForm({ workspace }: { workspace: FinanceWorkspace }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+
+  return (
+    <div className="wf-card space-y-3">
+      <h2 className="text-sm font-medium text-neutral-200">Desktop payroll items</h2>
+      <p className="text-xs text-neutral-500 leading-relaxed">
+        Define earnings, deductions, taxes, and employer contribution items similar to QuickBooks Desktop payroll items.
+      </p>
+      {msg && <p className="text-xs text-amber-400">{msg}</p>}
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          disabled={pending}
+          className="rounded-md border border-white/15 bg-white/5 px-3 py-2 text-xs text-neutral-200 hover:bg-white/10 disabled:opacity-40"
+          onClick={() => {
+            start(async () => {
+              setMsg(null);
+              const res = await seedPayrollDesktopItemCatalog({
+                tenantId: workspace.tenantId,
+                entityId: workspace.entityId,
+              });
+              setMsg(res.message);
+              if (res.success) router.refresh();
+            });
+          }}
+        >
+          {pending ? "Working…" : "Seed default desktop items"}
+        </button>
+      </div>
+      <form
+        className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget);
+          start(async () => {
+            setMsg(null);
+            const res = await createPayrollItemCatalog({
+              tenantId: workspace.tenantId,
+              entityId: workspace.entityId,
+              itemCode: String(fd.get("itemCode") ?? "").trim(),
+              itemName: String(fd.get("itemName") ?? "").trim(),
+              itemType: String(fd.get("itemType") ?? "earning") as
+                | "earning"
+                | "deduction"
+                | "tax"
+                | "company_contribution"
+                | "accrual",
+              calculationMethod: String(fd.get("calculationMethod") ?? "flat_amount") as
+                | "flat_amount"
+                | "hourly_rate"
+                | "percent_of_gross"
+                | "fixed_rate",
+              defaultRate: Number(fd.get("defaultRate") ?? "") || undefined,
+              defaultAmount: Number(fd.get("defaultAmount") ?? "") || undefined,
+              defaultPercent: Number(fd.get("defaultPercent") ?? "") || undefined,
+              taxability: String(fd.get("taxability") ?? "taxable") as
+                | "taxable"
+                | "pre_tax"
+                | "post_tax"
+                | "nontaxable",
+              agencyName: String(fd.get("agencyName") ?? "").trim() || undefined,
+            });
+            setMsg(res.message);
+            if (res.success) {
+              (e.target as HTMLFormElement).reset();
+              router.refresh();
+            }
+          });
+        }}
+      >
+        <label className="flex flex-col gap-1">
+          <span className="text-neutral-500 text-xs">Code</span>
+          <input name="itemCode" required className={input} />
+        </label>
+        <label className="flex flex-col gap-1 md:col-span-2">
+          <span className="text-neutral-500 text-xs">Name</span>
+          <input name="itemName" required className={input} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-neutral-500 text-xs">Type</span>
+          <select name="itemType" className={input}>
+            <option value="earning">earning</option>
+            <option value="deduction">deduction</option>
+            <option value="tax">tax</option>
+            <option value="company_contribution">company_contribution</option>
+            <option value="accrual">accrual</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-neutral-500 text-xs">Calc method</span>
+          <select name="calculationMethod" className={input}>
+            <option value="flat_amount">flat_amount</option>
+            <option value="hourly_rate">hourly_rate</option>
+            <option value="percent_of_gross">percent_of_gross</option>
+            <option value="fixed_rate">fixed_rate</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-neutral-500 text-xs">Taxability</span>
+          <select name="taxability" className={input}>
+            <option value="taxable">taxable</option>
+            <option value="pre_tax">pre_tax</option>
+            <option value="post_tax">post_tax</option>
+            <option value="nontaxable">nontaxable</option>
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-neutral-500 text-xs">Default rate</span>
+          <input name="defaultRate" type="number" min={0} step="0.0001" className={input} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-neutral-500 text-xs">Default amount</span>
+          <input name="defaultAmount" type="number" min={0} step="0.01" className={input} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-neutral-500 text-xs">Default percent</span>
+          <input name="defaultPercent" type="number" min={0} max={1} step="0.0001" className={input} />
+        </label>
+        <label className="flex flex-col gap-1 md:col-span-2">
+          <span className="text-neutral-500 text-xs">Agency (optional)</span>
+          <input name="agencyName" className={input} />
+        </label>
+        <div className="md:col-span-3">
+          <button
+            type="submit"
+            disabled={pending}
+            className="rounded-md bg-amber-600/90 px-4 py-2 text-sm font-medium text-black hover:bg-amber-500 disabled:opacity-50"
+          >
+            {pending ? "Saving…" : "Create payroll item"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+export function PayrollItemAssignmentForm({
+  workspace,
+  profiles,
+  items,
+}: {
+  workspace: FinanceWorkspace;
+  profiles: EmployeePayProfilePickRow[];
+  items: PayrollItemRow[];
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+
+  return (
+    <div className="wf-card space-y-3">
+      <h2 className="text-sm font-medium text-neutral-200">Assign payroll items to employees</h2>
+      {msg && <p className="text-xs text-amber-400">{msg}</p>}
+      <form
+        className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const fd = new FormData(e.currentTarget);
+          start(async () => {
+            setMsg(null);
+            const res = await assignEmployeePayrollItem({
+              tenantId: workspace.tenantId,
+              entityId: workspace.entityId,
+              employeePayProfileId: String(fd.get("employeePayProfileId") ?? ""),
+              payrollItemId: String(fd.get("payrollItemId") ?? ""),
+              overrideRate: Number(fd.get("overrideRate") ?? "") || undefined,
+              overrideAmount: Number(fd.get("overrideAmount") ?? "") || undefined,
+              overridePercent: Number(fd.get("overridePercent") ?? "") || undefined,
+              effectiveStartDate: String(fd.get("effectiveStartDate") ?? "").trim() || undefined,
+            });
+            setMsg(res.message);
+            if (res.success) router.refresh();
+          });
+        }}
+      >
+        <label className="flex flex-col gap-1 md:col-span-2">
+          <span className="text-neutral-500 text-xs">Employee pay profile</span>
+          <select name="employeePayProfileId" required className={input}>
+            <option value="">Select…</option>
+            {profiles.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.employee_number ?? "no-emp#"} — profile {p.id.slice(0, 8)} — person {p.finance_person_id.slice(0, 8)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1 md:col-span-2">
+          <span className="text-neutral-500 text-xs">Payroll item</span>
+          <select name="payrollItemId" required className={input}>
+            <option value="">Select…</option>
+            {items.map((i) => (
+              <option key={i.id} value={i.id}>
+                {i.item_code} — {i.item_name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-neutral-500 text-xs">Override rate</span>
+          <input name="overrideRate" type="number" min={0} step="0.0001" className={input} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-neutral-500 text-xs">Override amount</span>
+          <input name="overrideAmount" type="number" min={0} step="0.01" className={input} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-neutral-500 text-xs">Override percent</span>
+          <input name="overridePercent" type="number" min={0} max={1} step="0.0001" className={input} />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-neutral-500 text-xs">Effective start (optional)</span>
+          <input name="effectiveStartDate" type="date" className={input} />
+        </label>
+        <div className="md:col-span-2">
+          <button
+            type="submit"
+            disabled={pending || !profiles.length || !items.length}
+            className="rounded-md bg-amber-600/90 px-4 py-2 text-sm font-medium text-black hover:bg-amber-500 disabled:opacity-50"
+          >
+            {pending ? "Saving…" : "Assign item"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+export function PayrollDesktopApplyComponentsForm({
+  workspace,
+  runs,
+}: {
+  workspace: FinanceWorkspace;
+  runs: { id: string; run_number: string; run_status: string }[];
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+  const [runId, setRunId] = useState("");
+
+  return (
+    <div className="wf-card space-y-3">
+      <h2 className="text-sm font-medium text-neutral-200">Apply desktop payroll components</h2>
+      <p className="text-xs text-neutral-500 leading-relaxed">
+        Applies assigned payroll items to each run item, recalculates gross/net/taxes/deductions, and records liabilities.
+      </p>
+      {msg && <p className="text-xs text-amber-400">{msg}</p>}
+      <label className="flex flex-col gap-1">
+        <span className="text-neutral-500 text-xs">Run</span>
+        <select name="runId" className={input} value={runId} onChange={(e) => setRunId(e.target.value)}>
+          <option value="">Select…</option>
+          {runs.map((r) => (
+            <option key={r.id} value={r.id}>
+              {r.run_number} — {r.run_status}
+            </option>
+          ))}
+        </select>
+      </label>
+      <button
+        type="button"
+        disabled={pending || !runId}
+        className="rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm text-neutral-200 hover:bg-white/10 disabled:opacity-40"
+        onClick={() => {
+          start(async () => {
+            setMsg(null);
+            const res = await applyDesktopPayrollComponents({
+              tenantId: workspace.tenantId,
+              entityId: workspace.entityId,
+              payrollRunId: runId,
+            });
+            setMsg(res.message);
+            if (res.success) router.refresh();
+          });
+        }}
+      >
+        {pending ? "Working…" : "Apply components and liabilities"}
+      </button>
     </div>
   );
 }

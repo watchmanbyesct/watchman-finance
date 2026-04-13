@@ -9,6 +9,7 @@ const LINKS = [
   { href: "/finance/payroll/periods", label: "Pay periods" },
   { href: "/finance/payroll/profiles", label: "Employee pay profiles" },
   { href: "/finance/payroll/runs", label: "Payroll runs (create, load time, calculate, approve, finalize)" },
+  { href: "/finance/payroll/desktop", label: "Payroll desktop components (items, assignments, liabilities)" },
   { href: "/finance/payroll/statements", label: "Pay statements (from finalized runs)" },
 ];
 

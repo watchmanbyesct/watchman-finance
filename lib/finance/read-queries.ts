@@ -322,6 +322,46 @@ export async function listPayStatementsForEntity(tenantId: string, entityId: str
   return q(data, error);
 }
 
+export async function listPayrollItemCatalogForEntity(tenantId: string, entityId: string) {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("payroll_item_catalog")
+    .select(
+      "id, item_code, item_name, item_type, calculation_method, default_rate, default_amount, default_percent, taxability, agency_name, is_active, created_at"
+    )
+    .eq("tenant_id", tenantId)
+    .eq("entity_id", entityId)
+    .order("item_code");
+  return q(data, error);
+}
+
+export async function listEmployeePayItemAssignmentsForEntity(tenantId: string, entityId: string) {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("employee_pay_item_assignments")
+    .select(
+      "id, employee_pay_profile_id, payroll_item_id, assignment_status, override_rate, override_amount, override_percent, effective_start_date, effective_end_date, created_at"
+    )
+    .eq("tenant_id", tenantId)
+    .eq("entity_id", entityId)
+    .order("created_at", { ascending: false });
+  return q(data, error);
+}
+
+export async function listPayrollTaxLiabilitiesForEntity(tenantId: string, entityId: string) {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("payroll_tax_liabilities")
+    .select(
+      "id, payroll_run_id, payroll_item_id, agency_name, liability_type, amount, due_date, liability_status, created_at"
+    )
+    .eq("tenant_id", tenantId)
+    .eq("entity_id", entityId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  return q(data, error);
+}
+
 export async function listLeaveTypesForTenant(tenantId: string) {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase

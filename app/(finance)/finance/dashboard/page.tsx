@@ -205,6 +205,11 @@ function buildSetupChecklist(
       complete: PACK >= 25,
       href: "/finance/accounts",
     },
+    {
+      label: "Pack 026 — Desktop payroll components (items, assignments, liabilities)",
+      complete: PACK >= 26,
+      href: "/finance/payroll/desktop",
+    },
     { label: "ESCT Holdings tenant created", complete: true, href: null },
     {
       label: "ESCT entity — Enterprise Security Consulting and Training Inc.",
@@ -244,6 +249,7 @@ const MODULE_SCHEMA_STATUS: { name: string; ready: boolean }[] = [
   { name: "Evidence, approvals, TB cache & integration diagnostics", ready: PACK >= 23 },
   { name: "QuickBooks Online OAuth (Pack 002)", ready: PACK >= 24 },
   { name: "QBD account taxonomy & source of truth", ready: PACK >= 25 },
+  { name: "Desktop payroll items & liabilities", ready: PACK >= 26 },
 ];
 
 const QUICK_LINKS = [

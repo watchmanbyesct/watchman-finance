@@ -1122,3 +1122,479 @@ export async function reversePayrollRun(input: {
     return mapErrorToResult(err);
   }
 }
+
+const PAYROLL_ITEM_TYPE_VALUES = ["earning", "deduction", "tax", "company_contribution", "accrual"] as const;
+const PAYROLL_CALC_METHOD_VALUES = ["flat_amount", "hourly_rate", "percent_of_gross", "fixed_rate"] as const;
+const PAYROLL_TAXABILITY_VALUES = ["taxable", "pre_tax", "post_tax", "nontaxable"] as const;
+
+const CreatePayrollItemCatalogSchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid(),
+  itemCode: z.string().min(1).max(80),
+  itemName: z.string().min(1).max(255),
+  itemType: z.enum(PAYROLL_ITEM_TYPE_VALUES),
+  calculationMethod: z.enum(PAYROLL_CALC_METHOD_VALUES),
+  defaultRate: z.number().min(0).optional(),
+  defaultAmount: z.number().min(0).optional(),
+  defaultPercent: z.number().min(0).max(1).optional(),
+  taxability: z.enum(PAYROLL_TAXABILITY_VALUES).default("taxable"),
+  agencyName: z.string().max(255).optional(),
+});
+
+export async function createPayrollItemCatalog(
+  input: z.infer<typeof CreatePayrollItemCatalogSchema>
+): Promise<ActionResult<{ payrollItemId: string }>> {
+  try {
+    const v = CreatePayrollItemCatalogSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requireModuleEntitlement(ctx, "payroll");
+    requirePermission(ctx, "payroll.profile.manage");
+    requireEntityScope(ctx, v.entityId);
+
+    const admin = createSupabaseAdminClient();
+    const { data: row, error } = await admin
+      .from("payroll_item_catalog")
+      .insert({
+        tenant_id: v.tenantId,
+        entity_id: v.entityId,
+        item_code: v.itemCode.trim(),
+        item_name: v.itemName.trim(),
+        item_type: v.itemType,
+        calculation_method: v.calculationMethod,
+        default_rate: v.defaultRate ?? null,
+        default_amount: v.defaultAmount ?? null,
+        default_percent: v.defaultPercent ?? null,
+        taxability: v.taxability,
+        agency_name: v.agencyName?.trim() || null,
+        is_active: true,
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: v.entityId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "payroll",
+      actionCode: "payroll.item_catalog.create",
+      targetTable: "payroll_item_catalog",
+      targetRecordId: row.id,
+      newValues: { itemCode: v.itemCode, itemType: v.itemType, calculationMethod: v.calculationMethod },
+    });
+
+    return { success: true, message: "Payroll item created.", data: { payrollItemId: row.id } };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+const SeedPayrollDesktopItemCatalogSchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid(),
+});
+
+const DEFAULT_PAYROLL_DESKTOP_ITEMS: Array<{
+  itemCode: string;
+  itemName: string;
+  itemType: (typeof PAYROLL_ITEM_TYPE_VALUES)[number];
+  calculationMethod: (typeof PAYROLL_CALC_METHOD_VALUES)[number];
+  defaultRate?: number;
+  defaultAmount?: number;
+  defaultPercent?: number;
+  taxability: (typeof PAYROLL_TAXABILITY_VALUES)[number];
+  agencyName?: string;
+}> = [
+  { itemCode: "EARN_REG", itemName: "Regular Wages", itemType: "earning", calculationMethod: "hourly_rate", defaultRate: 0, taxability: "taxable" },
+  { itemCode: "EARN_OT", itemName: "Overtime Premium", itemType: "earning", calculationMethod: "percent_of_gross", defaultPercent: 0.1, taxability: "taxable" },
+  { itemCode: "DED_401K", itemName: "401(k) Employee", itemType: "deduction", calculationMethod: "percent_of_gross", defaultPercent: 0.05, taxability: "pre_tax" },
+  { itemCode: "DED_HEALTH", itemName: "Health Insurance Employee", itemType: "deduction", calculationMethod: "flat_amount", defaultAmount: 75, taxability: "post_tax" },
+  { itemCode: "TAX_FED_WH", itemName: "Federal Withholding", itemType: "tax", calculationMethod: "percent_of_gross", defaultPercent: 0.12, taxability: "taxable", agencyName: "IRS" },
+  { itemCode: "TAX_SS_EMP", itemName: "Social Security Employee", itemType: "tax", calculationMethod: "percent_of_gross", defaultPercent: 0.062, taxability: "taxable", agencyName: "IRS" },
+  { itemCode: "TAX_MED_EMP", itemName: "Medicare Employee", itemType: "tax", calculationMethod: "percent_of_gross", defaultPercent: 0.0145, taxability: "taxable", agencyName: "IRS" },
+  { itemCode: "TAX_SS_CO", itemName: "Social Security Employer", itemType: "company_contribution", calculationMethod: "percent_of_gross", defaultPercent: 0.062, taxability: "nontaxable", agencyName: "IRS" },
+  { itemCode: "TAX_MED_CO", itemName: "Medicare Employer", itemType: "company_contribution", calculationMethod: "percent_of_gross", defaultPercent: 0.0145, taxability: "nontaxable", agencyName: "IRS" },
+  { itemCode: "TAX_SUTA", itemName: "State Unemployment", itemType: "company_contribution", calculationMethod: "percent_of_gross", defaultPercent: 0.02, taxability: "nontaxable", agencyName: "State Agency" },
+];
+
+export async function seedPayrollDesktopItemCatalog(
+  input: z.infer<typeof SeedPayrollDesktopItemCatalogSchema>
+): Promise<ActionResult<{ seededCount: number }>> {
+  try {
+    const v = SeedPayrollDesktopItemCatalogSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requireModuleEntitlement(ctx, "payroll");
+    requirePermission(ctx, "payroll.profile.manage");
+    requireEntityScope(ctx, v.entityId);
+
+    const admin = createSupabaseAdminClient();
+    const rows = DEFAULT_PAYROLL_DESKTOP_ITEMS.map((item) => ({
+      tenant_id: v.tenantId,
+      entity_id: v.entityId,
+      item_code: item.itemCode,
+      item_name: item.itemName,
+      item_type: item.itemType,
+      calculation_method: item.calculationMethod,
+      default_rate: item.defaultRate ?? null,
+      default_amount: item.defaultAmount ?? null,
+      default_percent: item.defaultPercent ?? null,
+      taxability: item.taxability,
+      agency_name: item.agencyName ?? null,
+      is_active: true,
+      updated_at: new Date().toISOString(),
+    }));
+    const { error } = await admin.from("payroll_item_catalog").upsert(rows, { onConflict: "entity_id,item_code" });
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: v.entityId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "payroll",
+      actionCode: "payroll.item_catalog.seed",
+      targetTable: "payroll_item_catalog",
+      newValues: { seededCodes: DEFAULT_PAYROLL_DESKTOP_ITEMS.map((x) => x.itemCode) },
+    });
+
+    return { success: true, message: "Seeded desktop payroll items.", data: { seededCount: rows.length } };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+const AssignEmployeePayrollItemSchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid(),
+  employeePayProfileId: z.string().uuid(),
+  payrollItemId: z.string().uuid(),
+  overrideRate: z.number().min(0).optional(),
+  overrideAmount: z.number().min(0).optional(),
+  overridePercent: z.number().min(0).max(1).optional(),
+  effectiveStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});
+
+export async function assignEmployeePayrollItem(
+  input: z.infer<typeof AssignEmployeePayrollItemSchema>
+): Promise<ActionResult<{ assignmentId: string }>> {
+  try {
+    const v = AssignEmployeePayrollItemSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requireModuleEntitlement(ctx, "payroll");
+    requirePermission(ctx, "payroll.profile.manage");
+    requireEntityScope(ctx, v.entityId);
+
+    const admin = createSupabaseAdminClient();
+    const { data: profile } = await admin
+      .from("employee_pay_profiles")
+      .select("id")
+      .eq("id", v.employeePayProfileId)
+      .eq("tenant_id", v.tenantId)
+      .eq("entity_id", v.entityId)
+      .maybeSingle();
+    if (!profile) return { success: false, message: "Employee pay profile not found." };
+
+    const { data: item } = await admin
+      .from("payroll_item_catalog")
+      .select("id")
+      .eq("id", v.payrollItemId)
+      .eq("tenant_id", v.tenantId)
+      .eq("entity_id", v.entityId)
+      .maybeSingle();
+    if (!item) return { success: false, message: "Payroll item not found." };
+
+    const { data: row, error } = await admin
+      .from("employee_pay_item_assignments")
+      .upsert(
+        {
+          tenant_id: v.tenantId,
+          entity_id: v.entityId,
+          employee_pay_profile_id: v.employeePayProfileId,
+          payroll_item_id: v.payrollItemId,
+          assignment_status: "active",
+          override_rate: v.overrideRate ?? null,
+          override_amount: v.overrideAmount ?? null,
+          override_percent: v.overridePercent ?? null,
+          effective_start_date: v.effectiveStartDate ?? null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "employee_pay_profile_id,payroll_item_id" }
+      )
+      .select("id")
+      .single();
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: v.entityId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "payroll",
+      actionCode: "payroll.item_assignment.upsert",
+      targetTable: "employee_pay_item_assignments",
+      targetRecordId: row.id,
+      newValues: { employeePayProfileId: v.employeePayProfileId, payrollItemId: v.payrollItemId },
+    });
+
+    return { success: true, message: "Payroll item assigned to employee profile.", data: { assignmentId: row.id } };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+const ApplyDesktopComponentsSchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid(),
+  payrollRunId: z.string().uuid(),
+});
+
+function resolveComponentAmount(params: {
+  calcMethod: string;
+  baseGross: number;
+  regularHours: number;
+  defaultRate: number | null;
+  defaultAmount: number | null;
+  defaultPercent: number | null;
+  overrideRate: number | null;
+  overrideAmount: number | null;
+  overridePercent: number | null;
+}): number {
+  const rate = params.overrideRate ?? params.defaultRate ?? 0;
+  const amount = params.overrideAmount ?? params.defaultAmount ?? 0;
+  const percent = params.overridePercent ?? params.defaultPercent ?? 0;
+  if (params.calcMethod === "flat_amount") return roundMoney(amount);
+  if (params.calcMethod === "hourly_rate") return roundMoney(params.regularHours * rate);
+  if (params.calcMethod === "fixed_rate") return roundMoney(rate);
+  return roundMoney(params.baseGross * percent);
+}
+
+export async function applyDesktopPayrollComponents(
+  input: z.infer<typeof ApplyDesktopComponentsSchema>
+): Promise<ActionResult<{ componentCount: number; liabilityCount: number }>> {
+  try {
+    const v = ApplyDesktopComponentsSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requireModuleEntitlement(ctx, "payroll");
+    requirePermission(ctx, "payroll.run.calculate");
+    requireEntityScope(ctx, v.entityId);
+
+    const admin = createSupabaseAdminClient();
+    const { data: run } = await admin
+      .from("payroll_runs")
+      .select("id, run_status, pay_date")
+      .eq("id", v.payrollRunId)
+      .eq("tenant_id", v.tenantId)
+      .eq("entity_id", v.entityId)
+      .maybeSingle();
+    if (!run) return { success: false, message: "Payroll run not found." };
+    if (!["draft", "calculating", "review", "approved"].includes(String(run.run_status))) {
+      return { success: false, message: `Run status ${String(run.run_status)} cannot be re-componentized.` };
+    }
+
+    const { data: runItems, error: rie } = await admin
+      .from("payroll_run_items")
+      .select("id, employee_pay_profile_id, gross_pay, regular_hours")
+      .eq("tenant_id", v.tenantId)
+      .eq("entity_id", v.entityId)
+      .eq("payroll_run_id", v.payrollRunId);
+    if (rie) throw new Error(rie.message);
+    if (!(runItems ?? []).length) return { success: false, message: "No payroll run items to componentize." };
+
+    const profileIds = [...new Set((runItems ?? []).map((r: any) => String(r.employee_pay_profile_id)).filter(Boolean))];
+    const { data: assignments, error: ae } = await admin
+      .from("employee_pay_item_assignments")
+      .select(
+        "id, employee_pay_profile_id, payroll_item_id, assignment_status, override_rate, override_amount, override_percent"
+      )
+      .eq("tenant_id", v.tenantId)
+      .eq("entity_id", v.entityId)
+      .eq("assignment_status", "active")
+      .in("employee_pay_profile_id", profileIds);
+    if (ae) throw new Error(ae.message);
+
+    const payrollItemIds = [...new Set((assignments ?? []).map((a: any) => String(a.payroll_item_id)).filter(Boolean))];
+    if (!payrollItemIds.length) {
+      return { success: false, message: "No active payroll item assignments found for run item profiles." };
+    }
+
+    const { data: items, error: ie } = await admin
+      .from("payroll_item_catalog")
+      .select(
+        "id, item_code, item_type, calculation_method, default_rate, default_amount, default_percent, agency_name, is_active"
+      )
+      .eq("tenant_id", v.tenantId)
+      .eq("entity_id", v.entityId)
+      .eq("is_active", true)
+      .in("id", payrollItemIds);
+    if (ie) throw new Error(ie.message);
+
+    const itemById = new Map<string, any>((items ?? []).map((it: any) => [String(it.id), it]));
+    const assignmentsByProfile = new Map<string, any[]>();
+    for (const a of assignments ?? []) {
+      const key = String((a as any).employee_pay_profile_id);
+      const arr = assignmentsByProfile.get(key) ?? [];
+      arr.push(a);
+      assignmentsByProfile.set(key, arr);
+    }
+
+    await admin.from("payroll_run_item_components").delete().eq("payroll_run_id", v.payrollRunId).eq("tenant_id", v.tenantId);
+    await admin.from("payroll_tax_liabilities").delete().eq("payroll_run_id", v.payrollRunId).eq("tenant_id", v.tenantId);
+
+    const componentRows: Record<string, unknown>[] = [];
+    const liabilityRows: Record<string, unknown>[] = [];
+    for (const ri of runItems ?? []) {
+      const profileId = String((ri as any).employee_pay_profile_id ?? "");
+      if (!profileId) continue;
+      const linkedAssignments = assignmentsByProfile.get(profileId) ?? [];
+      let gross = Number((ri as any).gross_pay ?? 0);
+      let empTaxes = 0;
+      let erTaxes = 0;
+      let deductions = 0;
+      for (const asn of linkedAssignments) {
+        const item = itemById.get(String((asn as any).payroll_item_id));
+        if (!item) continue;
+        const amount = resolveComponentAmount({
+          calcMethod: String(item.calculation_method),
+          baseGross: Number((ri as any).gross_pay ?? 0),
+          regularHours: Number((ri as any).regular_hours ?? 0),
+          defaultRate: item.default_rate != null ? Number(item.default_rate) : null,
+          defaultAmount: item.default_amount != null ? Number(item.default_amount) : null,
+          defaultPercent: item.default_percent != null ? Number(item.default_percent) : null,
+          overrideRate: (asn as any).override_rate != null ? Number((asn as any).override_rate) : null,
+          overrideAmount: (asn as any).override_amount != null ? Number((asn as any).override_amount) : null,
+          overridePercent: (asn as any).override_percent != null ? Number((asn as any).override_percent) : null,
+        });
+        if (amount === 0) continue;
+        const itemType = String(item.item_type);
+        let componentType: string = "earning";
+        if (itemType === "deduction") componentType = "deduction";
+        if (itemType === "tax") componentType = "employee_tax";
+        if (itemType === "company_contribution") componentType = "employer_tax";
+        if (itemType === "accrual") componentType = "accrual";
+
+        componentRows.push({
+          tenant_id: v.tenantId,
+          entity_id: v.entityId,
+          payroll_run_id: v.payrollRunId,
+          payroll_run_item_id: (ri as any).id,
+          payroll_item_id: item.id,
+          component_type: componentType,
+          basis_amount: Number((ri as any).gross_pay ?? 0),
+          quantity: Number((ri as any).regular_hours ?? 0),
+          rate: (asn as any).override_rate ?? item.default_rate ?? null,
+          amount,
+          memo: item.item_code,
+        });
+
+        if (itemType === "earning") {
+          gross = roundMoney(gross + amount);
+        } else if (itemType === "deduction") {
+          deductions = roundMoney(deductions + amount);
+          liabilityRows.push({
+            tenant_id: v.tenantId,
+            entity_id: v.entityId,
+            payroll_run_id: v.payrollRunId,
+            payroll_item_id: item.id,
+            agency_name: item.agency_name ?? "Internal Benefit",
+            liability_type: "deduction",
+            amount,
+            due_date: run.pay_date ?? null,
+            liability_status: "open",
+          });
+        } else if (itemType === "tax") {
+          empTaxes = roundMoney(empTaxes + amount);
+          liabilityRows.push({
+            tenant_id: v.tenantId,
+            entity_id: v.entityId,
+            payroll_run_id: v.payrollRunId,
+            payroll_item_id: item.id,
+            agency_name: item.agency_name ?? "Tax Agency",
+            liability_type: "employee_tax",
+            amount,
+            due_date: run.pay_date ?? null,
+            liability_status: "open",
+          });
+        } else if (itemType === "company_contribution" || itemType === "accrual") {
+          erTaxes = roundMoney(erTaxes + amount);
+          liabilityRows.push({
+            tenant_id: v.tenantId,
+            entity_id: v.entityId,
+            payroll_run_id: v.payrollRunId,
+            payroll_item_id: item.id,
+            agency_name: item.agency_name ?? "Agency",
+            liability_type: itemType === "company_contribution" ? "employer_tax" : "benefit_payable",
+            amount,
+            due_date: run.pay_date ?? null,
+            liability_status: "open",
+          });
+        }
+      }
+      const net = roundMoney(gross - empTaxes - deductions);
+      const { error: uie } = await admin
+        .from("payroll_run_items")
+        .update({
+          gross_pay: roundMoney(gross),
+          employee_taxes: roundMoney(empTaxes),
+          employer_taxes: roundMoney(erTaxes),
+          deductions_total: roundMoney(deductions),
+          net_pay: roundMoney(net),
+        })
+        .eq("id", (ri as any).id)
+        .eq("tenant_id", v.tenantId);
+      if (uie) throw new Error(uie.message);
+    }
+
+    if (componentRows.length) {
+      const { error: ce } = await admin.from("payroll_run_item_components").insert(componentRows);
+      if (ce) throw new Error(ce.message);
+    }
+    if (liabilityRows.length) {
+      const { error: le } = await admin.from("payroll_tax_liabilities").insert(liabilityRows);
+      if (le) throw new Error(le.message);
+    }
+
+    const { data: sums, error: se } = await admin
+      .from("payroll_run_items")
+      .select("gross_pay, net_pay, employee_taxes, employer_taxes, deductions_total")
+      .eq("payroll_run_id", v.payrollRunId)
+      .eq("tenant_id", v.tenantId);
+    if (se) throw new Error(se.message);
+
+    const totalGross = roundMoney((sums ?? []).reduce((s: number, r: any) => s + Number(r.gross_pay ?? 0), 0));
+    const totalNet = roundMoney((sums ?? []).reduce((s: number, r: any) => s + Number(r.net_pay ?? 0), 0));
+    const totalEmpTax = roundMoney((sums ?? []).reduce((s: number, r: any) => s + Number(r.employee_taxes ?? 0), 0));
+    const totalErTax = roundMoney((sums ?? []).reduce((s: number, r: any) => s + Number(r.employer_taxes ?? 0), 0));
+    const totalDed = roundMoney((sums ?? []).reduce((s: number, r: any) => s + Number(r.deductions_total ?? 0), 0));
+
+    const { error: ue } = await admin
+      .from("payroll_runs")
+      .update({
+        total_gross: totalGross,
+        total_net: totalNet,
+        total_employee_taxes: totalEmpTax,
+        total_employer_taxes: totalErTax,
+        total_deductions: totalDed,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", v.payrollRunId)
+      .eq("tenant_id", v.tenantId);
+    if (ue) throw new Error(ue.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: v.entityId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "payroll",
+      actionCode: "payroll.run.apply_desktop_components",
+      targetTable: "payroll_runs",
+      targetRecordId: v.payrollRunId,
+      metadata: { componentCount: componentRows.length, liabilityCount: liabilityRows.length },
+    });
+
+    return {
+      success: true,
+      message: "Applied desktop payroll components to run items and liabilities.",
+      data: { componentCount: componentRows.length, liabilityCount: liabilityRows.length },
+    };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
