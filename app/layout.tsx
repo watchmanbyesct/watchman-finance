@@ -26,6 +26,10 @@ const fontMono = DM_Mono({
 export const metadata: Metadata = {
   title: "Watchman Finance",
   description: "Financial operating system for the Watchman ecosystem.",
+  icons: {
+    icon: "/branding/watchman-by-esct.png",
+    apple: "/branding/watchman-by-esct.png",
+  },
 };
 
 export default function RootLayout({

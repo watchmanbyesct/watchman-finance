@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard, BookOpen, Users, Building2, FileText,
@@ -240,18 +241,22 @@ export function FinanceSidebar() {
                  flex-shrink-0"
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 px-5 py-5 border-b border-white/8">
-        <div
-          className="w-7 h-7 rounded-md bg-amber-500 flex items-center justify-center
-                     flex-shrink-0"
-        >
-          <span className="text-black font-bold text-xs">W</span>
+      <Link
+        href="/finance/dashboard"
+        className="flex items-center gap-2.5 px-4 py-4 border-b border-white/8 hover:bg-white/[0.03] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-amber-500/40"
+      >
+        <Image
+          src="/branding/watchman-by-esct.png"
+          alt="Watchman by ESCT"
+          width={40}
+          height={40}
+          className="h-10 w-10 rounded-md object-contain flex-shrink-0 border border-white/10 bg-black/30"
+        />
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold text-neutral-100 leading-tight truncate">Watchman</p>
+          <p className="text-[9px] text-amber-500 uppercase tracking-widest mt-0.5">Finance</p>
         </div>
-        <div>
-          <p className="text-xs font-semibold text-neutral-100 leading-none">Watchman</p>
-          <p className="text-[10px] text-amber-500 uppercase tracking-widest mt-0.5">Finance</p>
-        </div>
-      </div>
+      </Link>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 space-y-5">

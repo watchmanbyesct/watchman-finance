@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import { WatchmanLogo } from "@/components/branding/watchman-logo";
 import { LoginForm } from "@/components/shared/login-form";
 
 export const metadata = {
@@ -9,14 +10,12 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-[#0d0d0d] px-4">
       <div className="w-full max-w-sm">
-        {/* Wordmark */}
+        {/* Brand */}
         <div className="mb-10 text-center">
-          <p className="text-xs uppercase tracking-[0.25em] text-amber-500 font-medium mb-2">
-            Watchman Ecosystem
+          <WatchmanLogo className="h-28 w-auto mx-auto" priority />
+          <p className="mt-4 text-xs uppercase tracking-[0.25em] text-amber-500 font-medium">
+            Watchman Finance
           </p>
-          <h1 className="font-display text-3xl font-semibold text-neutral-50">
-            Finance
-          </h1>
           <p className="mt-2 text-sm text-neutral-500">
             Financial operating system for ESCT Holdings
           </p>

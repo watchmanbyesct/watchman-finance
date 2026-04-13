@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+import Link from "next/link";
 import { Bell, Search, LogOut } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/db/supabase-browser";
@@ -15,9 +17,22 @@ export function FinanceTopbar() {
   }
 
   return (
-    <header className="flex items-center justify-between h-14 px-6 border-b border-white/8 bg-[#0d0d0d] flex-shrink-0">
+    <header className="flex items-center justify-between h-14 px-4 sm:px-6 border-b border-white/8 bg-[#0d0d0d] flex-shrink-0 gap-3">
+      <Link
+        href="/finance/dashboard"
+        className="flex-shrink-0 rounded-md border border-white/10 overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50"
+        aria-label="Watchman Finance home"
+      >
+        <Image
+          src="/branding/watchman-by-esct.png"
+          alt="Watchman by ESCT"
+          width={32}
+          height={32}
+          className="h-8 w-8 object-contain bg-black/30"
+        />
+      </Link>
       {/* Search */}
-      <div className="flex items-center gap-2 w-72">
+      <div className="flex items-center gap-2 flex-1 max-w-md min-w-0">
         <div className="flex items-center gap-2 flex-1 rounded-md border border-white/8 bg-white/4 px-3 py-1.5">
           <Search size={13} className="text-neutral-500 flex-shrink-0" />
           <input
