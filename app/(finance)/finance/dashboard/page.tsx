@@ -1,8 +1,11 @@
 import {
   TrendingUp, AlertCircle, CheckCircle2,
   ArrowRight, Clock, DollarSign, Users, FileText,
+  Receipt, CreditCard, Wallet, Sparkles, LayoutGrid, Building2,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
+import clsx from "clsx";
 import { WATCHMAN_DEPLOYED_MIGRATION_PACK } from "@/lib/constants/watchman-migrations";
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import { getFinanceDashboardMetrics, type FinanceDashboardMetrics } from "@/lib/finance/read-queries";
@@ -24,34 +27,87 @@ function formatUsd(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
 }
 
-const FALLBACK_STATS = [
+type StatAccent = "emerald" | "rose" | "sky" | "amber";
+
+type DashboardStat = {
+  label: string;
+  value: string;
+  note: string;
+  href: string;
+  icon: LucideIcon;
+  accent: StatAccent;
+};
+
+const ACCENT: Record<
+  StatAccent,
+  { border: string; gradient: string; iconWrap: string; icon: string }
+> = {
+  emerald: {
+    border: "border-emerald-500/20 hover:border-emerald-400/40",
+    gradient: "from-emerald-500/[0.12] via-emerald-500/[0.02] to-transparent",
+    iconWrap:
+      "border-emerald-400/25 bg-emerald-500/10 shadow-[0_0_28px_-8px_rgba(52,211,153,0.55)]",
+    icon: "text-emerald-300",
+  },
+  rose: {
+    border: "border-rose-500/20 hover:border-rose-400/40",
+    gradient: "from-rose-500/[0.12] via-rose-500/[0.02] to-transparent",
+    iconWrap:
+      "border-rose-400/25 bg-rose-500/10 shadow-[0_0_28px_-8px_rgba(251,113,133,0.5)]",
+    icon: "text-rose-300",
+  },
+  sky: {
+    border: "border-sky-500/20 hover:border-sky-400/40",
+    gradient: "from-sky-500/[0.12] via-sky-500/[0.02] to-transparent",
+    iconWrap:
+      "border-sky-400/25 bg-sky-500/10 shadow-[0_0_28px_-8px_rgba(56,189,248,0.5)]",
+    icon: "text-sky-300",
+  },
+  amber: {
+    border: "border-amber-500/25 hover:border-amber-400/45",
+    gradient: "from-amber-500/[0.14] via-amber-500/[0.03] to-transparent",
+    iconWrap:
+      "border-amber-400/30 bg-amber-500/10 shadow-[0_0_28px_-8px_rgba(245,158,11,0.55)]",
+    icon: "text-amber-300",
+  },
+};
+
+const FALLBACK_STATS: DashboardStat[] = [
   {
     label: "AR Balance",
     value: "$0.00",
     note: "Sign in with workspace to load live AR",
     href: "/finance/ar/invoices",
+    icon: Receipt,
+    accent: "emerald",
   },
   {
     label: "AP Balance",
     value: "$0.00",
     note: "Sign in with workspace to load live AP",
     href: "/finance/ap/bills",
+    icon: CreditCard,
+    accent: "rose",
   },
   {
     label: "Open invoices",
     value: "—",
     note: "Entity-scoped issued / partial",
     href: "/finance/ar/invoices",
+    icon: Wallet,
+    accent: "sky",
   },
   {
     label: "Payroll",
     value: "—",
     note: "Pay groups & draft runs",
     href: "/finance/payroll/runs",
+    icon: DollarSign,
+    accent: "amber",
   },
 ];
 
-function statsFromMetrics(m: FinanceDashboardMetrics) {
+function statsFromMetrics(m: FinanceDashboardMetrics): DashboardStat[] {
   const payrollValue =
     m.payGroupCount === 0
       ? "No pay groups"
@@ -65,24 +121,32 @@ function statsFromMetrics(m: FinanceDashboardMetrics) {
       value: formatUsd(m.arBalanceDue),
       note: `${m.openInvoiceCount} open invoice(s)`,
       href: "/finance/ar/invoices",
+      icon: Receipt,
+      accent: "emerald",
     },
     {
       label: "AP balance (open)",
       value: formatUsd(m.apBalanceDue),
       note: `${m.openBillCount} open bill(s)`,
       href: "/finance/ap/bills",
+      icon: CreditCard,
+      accent: "rose",
     },
     {
       label: "Open invoices",
       value: String(m.openInvoiceCount),
       note: "Issued or partially paid",
       href: "/finance/ar/invoices",
+      icon: Wallet,
+      accent: "sky",
     },
     {
       label: "Payroll — next focus",
       value: payrollValue,
       note: payrollNote,
       href: "/finance/payroll/runs",
+      icon: DollarSign,
+      accent: "amber",
     },
   ];
 }
@@ -184,84 +248,174 @@ export default async function FinanceDashboardPage() {
   });
   const checklistDone = SETUP_CHECKLIST.filter((i) => i.complete).length;
   const packLabel = String(WATCHMAN_DEPLOYED_MIGRATION_PACK).padStart(3, "0");
+  const checklistPct = Math.round((checklistDone / SETUP_CHECKLIST.length) * 100);
+  const modulesLive = MODULE_SCHEMA_STATUS.filter((m) => m.ready).length;
 
   return (
-    <div className="max-w-6xl space-y-8">
+    <div className="max-w-6xl space-y-8 pb-4">
+      {/* Hero */}
+      <section
+        className="relative overflow-hidden rounded-2xl border border-amber-500/25 bg-gradient-to-br from-[#1e1a12] via-[#151311] to-[#0c0c0c]
+                   px-5 py-7 sm:px-8 sm:py-9 shadow-[0_24px_80px_-32px_rgba(245,158,11,0.35)]"
+      >
+        <div
+          className="pointer-events-none absolute -right-24 -top-28 h-72 w-72 rounded-full bg-amber-500/[0.14] blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute -bottom-32 left-0 h-56 w-56 rounded-full bg-emerald-600/[0.08] blur-3xl"
+          aria-hidden
+        />
+        <div
+          className="pointer-events-none absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2240%22%20height%3D%2240%22%3E%3Cpath%20d%3D%22M0%20h40%20M40%200%20v40%22%20fill%3D%22none%22%20stroke%3D%22rgba(255%2C255%2C255%2C0.04)%22%20stroke-width%3D%221%22%2F%3E%3C%2Fsvg%3E')] opacity-80"
+          aria-hidden
+        />
 
-      {/* Page header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="wf-page-title">Finance Dashboard</h1>
-          <p className="text-sm text-neutral-500 mt-1">{today} &mdash; ESCT Holdings / ESCT</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="wf-badge wf-badge-success">
-            <CheckCircle2 size={10} className="mr-1" />
-            Packs 001–{packLabel} applied
-          </span>
-        </div>
-      </div>
-
-      {/* KPI Stats — live when workspace + queries succeed */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat) => (
-          <Link href={stat.href} key={stat.label} className="wf-card group hover:border-white/20 transition-colors">
-            <div className="wf-stat">
-              <p className="wf-stat-label">{stat.label}</p>
-              <p className="wf-stat-value mt-1">{stat.value}</p>
-              <p className="text-xs text-neutral-600 mt-1">{stat.note}</p>
-            </div>
-            <div className="mt-3 flex items-center gap-1 text-xs text-neutral-600 group-hover:text-amber-500 transition-colors">
-              View <ArrowRight size={10} />
-            </div>
-          </Link>
-        ))}
-      </div>
-
-      {/* Body grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-        {/* Setup checklist — spans 2 cols */}
-        <div className="lg:col-span-2 wf-card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="wf-section-title">Platform Setup Checklist</h2>
-            <span className="text-xs text-neutral-500">
-              {checklistDone} / {SETUP_CHECKLIST.length} complete
+        <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-2">
+            <p className="inline-flex items-center gap-2 rounded-full border border-amber-500/25 bg-amber-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-200/90">
+              <Sparkles className="h-3.5 w-3.5 text-amber-400" aria-hidden />
+              {workspace ? "Live workspace" : "Getting started"}
+            </p>
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-neutral-50 sm:text-4xl">
+              Finance Dashboard
+            </h1>
+            <p className="max-w-xl text-sm leading-relaxed text-neutral-400">
+              <span className="text-neutral-300">{today}</span>
+              <span className="mx-2 text-neutral-600">·</span>
+              {workspace ? (
+                <>
+                  <Building2 className="mr-1.5 inline-block h-3.5 w-3.5 text-amber-500/80 align-[-2px]" aria-hidden />
+                  {workspace.tenantDisplayName}
+                  <span className="text-neutral-600"> / </span>
+                  <span className="text-neutral-300">{workspace.entityDisplayName}</span>
+                </>
+              ) : (
+                <>ESCT Holdings — connect workspace for live KPIs</>
+              )}
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="wf-badge wf-badge-success shadow-[0_0_20px_-6px_rgba(34,197,94,0.45)]">
+              <CheckCircle2 size={10} className="mr-1" />
+              Packs 001–{packLabel}
+            </span>
+            <span className="rounded-full border border-white/10 bg-black/25 px-3 py-1.5 text-xs text-neutral-400 backdrop-blur-sm">
+              {modulesLive}/{MODULE_SCHEMA_STATUS.length} modules live
             </span>
           </div>
+        </div>
+      </section>
 
-          <div className="space-y-2.5">
+      {/* KPI tiles */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {stats.map((stat) => {
+          const a = ACCENT[stat.accent];
+          const Icon = stat.icon;
+          return (
+            <Link
+              href={stat.href}
+              key={stat.label}
+              className={clsx(
+                "group relative overflow-hidden rounded-xl border bg-[#141414]/90 p-5 transition-all duration-300",
+                "motion-safe:hover:-translate-y-1 motion-safe:hover:shadow-[0_20px_50px_-24px_rgba(0,0,0,0.85)]",
+                a.border,
+              )}
+            >
+              <div
+                className={clsx(
+                  "pointer-events-none absolute inset-0 bg-gradient-to-br opacity-90",
+                  a.gradient,
+                )}
+                aria-hidden
+              />
+              <div className="relative flex gap-4">
+                <div className="min-w-0 flex-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+                    {stat.label}
+                  </p>
+                  <p className="mt-2 font-display text-2xl font-semibold tabular-nums tracking-tight text-neutral-50 sm:text-[1.65rem]">
+                    {stat.value}
+                  </p>
+                  <p className="mt-1.5 text-xs leading-snug text-neutral-500">{stat.note}</p>
+                  <div className="mt-4 inline-flex items-center gap-1 text-xs font-medium text-neutral-500 transition-colors group-hover:text-amber-400">
+                    Open
+                    <ArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                  </div>
+                </div>
+                <div
+                  className={clsx(
+                    "flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl border",
+                    a.iconWrap,
+                  )}
+                >
+                  <Icon className={clsx("h-5 w-5", a.icon)} strokeWidth={1.75} aria-hidden />
+                </div>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 rounded-xl border border-white/10 bg-gradient-to-b from-[#181818] to-[#121212] p-5 sm:p-6 shadow-xl shadow-black/40">
+          <div className="mb-5 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="wf-section-title">Platform setup</h2>
+              <p className="mt-1 text-xs text-neutral-500">Migrations, tenant, and go-live tasks</p>
+            </div>
+            <div className="w-full sm:w-52">
+              <div className="mb-1 flex justify-between text-[11px] font-medium uppercase tracking-wider text-neutral-500">
+                <span>Progress</span>
+                <span className="tabular-nums text-amber-500/90">{checklistPct}%</span>
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-white/[0.06] ring-1 ring-white/[0.06]">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-amber-700 via-amber-500 to-amber-300 transition-[width] duration-500"
+                  style={{ width: `${checklistPct}%` }}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="max-h-[min(70vh,520px)] space-y-1 overflow-y-auto pr-1 [-webkit-overflow-scrolling:touch]">
             {SETUP_CHECKLIST.map((item) => (
               <div
                 key={item.label}
-                className="flex items-center gap-3 py-1"
+                className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-white/[0.04]"
               >
-                <div className={`
-                  w-4 h-4 rounded-full flex-shrink-0 flex items-center justify-center
-                  ${item.complete
-                    ? "bg-green-500/20 border border-green-500/40"
-                    : "border border-white/15 bg-white/3"
-                  }
-                `}>
-                  {item.complete && <CheckCircle2 size={10} className="text-green-400" />}
+                <div
+                  className={clsx(
+                    "flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full border",
+                    item.complete
+                      ? "border-green-500/45 bg-green-500/15 shadow-[0_0_12px_-4px_rgba(34,197,94,0.5)]"
+                      : "border-white/15 bg-white/[0.04]",
+                  )}
+                >
+                  {item.complete && <CheckCircle2 size={11} className="text-green-400" />}
                 </div>
-                <span className={`text-sm flex-1 ${item.complete ? "text-neutral-500 line-through" : "text-neutral-300"}`}>
+                <span
+                  className={clsx(
+                    "min-w-0 flex-1 text-sm leading-snug",
+                    item.complete ? "text-neutral-500 line-through decoration-neutral-600" : "text-neutral-200",
+                  )}
+                >
                   {item.label}
                 </span>
                 {!item.complete && item.href && (
                   <Link
                     href={item.href}
-                    className="text-xs text-amber-500 hover:text-amber-400 transition-colors flex items-center gap-0.5"
+                    className="flex flex-shrink-0 items-center gap-0.5 rounded-md px-2 py-1 text-xs font-medium text-amber-500 transition-colors hover:bg-amber-500/10 hover:text-amber-400"
                   >
-                    Set up <ArrowRight size={9} />
+                    Set up <ArrowRight size={10} />
                   </Link>
                 )}
                 {!item.complete && !item.href && (
                   <span
-                    className="text-xs text-neutral-600 flex items-center gap-0.5 max-w-[11rem] text-right leading-snug"
+                    className="flex max-w-[10.5rem] flex-shrink-0 items-center gap-1 text-right text-[11px] leading-snug text-neutral-500"
                     title={item.pendingTitle}
                   >
-                    <AlertCircle size={9} className="flex-shrink-0" />
+                    <AlertCircle size={10} className="flex-shrink-0 text-neutral-600" />
                     {item.pendingNote ?? "Requires migration"}
                   </span>
                 )}
@@ -270,42 +424,61 @@ export default async function FinanceDashboardPage() {
           </div>
         </div>
 
-        {/* Quick links */}
         <div className="space-y-4">
-          <div className="wf-card">
-            <h2 className="wf-section-title mb-4">Quick Actions</h2>
-            <div className="space-y-1.5">
+          <div className="rounded-xl border border-white/10 bg-[#141414] p-5 shadow-lg shadow-black/35">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="wf-section-title">Quick actions</h2>
+              <LayoutGrid className="h-4 w-4 text-neutral-600" aria-hidden />
+            </div>
+            <div className="grid grid-cols-1 gap-2">
               {QUICK_LINKS.map((link) => {
                 const Icon = link.icon;
                 return (
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="flex items-center gap-3 px-3 py-2.5 rounded-md
-                               text-sm text-neutral-300 hover:text-neutral-100
-                               hover:bg-white/5 transition-colors group"
+                    className="group flex items-center gap-3 rounded-lg border border-transparent bg-white/[0.03] px-3 py-2.5 transition-all hover:border-amber-500/20 hover:bg-amber-500/[0.06]"
                   >
-                    <Icon size={13} className="text-neutral-500 group-hover:text-amber-400 transition-colors flex-shrink-0" />
-                    {link.label}
-                    <ArrowRight size={11} className="ml-auto text-neutral-700 group-hover:text-neutral-400 transition-colors" />
+                    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg border border-white/10 bg-gradient-to-br from-white/[0.08] to-transparent text-amber-500/90 transition-colors group-hover:border-amber-500/30 group-hover:text-amber-400">
+                      <Icon size={16} strokeWidth={1.75} aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1 text-sm font-medium text-neutral-200 group-hover:text-neutral-50">
+                      {link.label}
+                    </span>
+                    <ArrowRight
+                      size={14}
+                      className="flex-shrink-0 text-neutral-600 transition-transform group-hover:translate-x-0.5 group-hover:text-neutral-400"
+                      aria-hidden
+                    />
                   </Link>
                 );
               })}
             </div>
           </div>
 
-          {/* Module status */}
-          <div className="wf-card-gold">
-            <h2 className="wf-section-title mb-3">Module Status</h2>
-            <div className="space-y-2">
+          <div className="rounded-xl border border-amber-500/30 bg-gradient-to-br from-[#1a1610] to-[#121212] p-5 shadow-[0_20px_50px_-28px_rgba(245,158,11,0.25)]">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="wf-section-title">Module status</h2>
+              <span className="text-[11px] font-medium uppercase tracking-wider text-amber-500/80">
+                Schema
+              </span>
+            </div>
+            <div className="grid max-h-64 grid-cols-1 gap-x-3 gap-y-2 overflow-y-auto text-[11px] sm:grid-cols-2">
               {MODULE_SCHEMA_STATUS.map(({ name, ready }) => (
-                <div key={name} className="flex items-center justify-between gap-2">
-                  <span className="text-xs text-neutral-400">{name}</span>
-                  {ready ? (
-                    <span className="wf-badge wf-badge-success text-[10px] py-0.5">Schema live</span>
-                  ) : (
-                    <span className="wf-badge wf-badge-warning text-[10px] py-0.5">Migration pending</span>
-                  )}
+                <div
+                  key={name}
+                  className="flex items-center justify-between gap-2 rounded-md border border-white/[0.06] bg-black/20 px-2.5 py-1.5"
+                >
+                  <span className="min-w-0 truncate text-neutral-400" title={name}>
+                    {name}
+                  </span>
+                  <span
+                    className={clsx(
+                      "h-1.5 w-1.5 flex-shrink-0 rounded-full",
+                      ready ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]" : "bg-amber-600/80",
+                    )}
+                    title={ready ? "Live" : "Pending"}
+                  />
                 </div>
               ))}
             </div>
@@ -313,19 +486,30 @@ export default async function FinanceDashboardPage() {
         </div>
       </div>
 
-      {/* Next steps */}
-      <div className="rounded-lg border border-white/10 bg-white/[0.03] px-5 py-4 flex items-start gap-3">
-        <Clock size={16} className="text-neutral-500 flex-shrink-0 mt-0.5" />
-        <div>
-          <p className="text-sm font-medium text-neutral-200">Operational next steps</p>
-          <p className="text-sm text-neutral-500 mt-1">
-            KPI tiles above use live invoice and bill balances when you are signed in with a finance workspace. Bump{" "}
-            <code className="text-xs text-neutral-400">WATCHMAN_DEPLOYED_MIGRATION_PACK</code> in{" "}
-            <code className="text-xs text-neutral-400">lib/constants/watchman-migrations.ts</code> whenever you apply
-            additional packs so module banners stay accurate. To stand up ESCT Holdings and the ESCT entity
-            (Enterprise Security Consulting and Training Inc.), apply the SQL migrations through Pack 001 onward, then run{" "}
-            <code className="text-xs text-neutral-400">npm run greenfield:bootstrap</code>.
-          </p>
+      <div className="relative overflow-hidden rounded-xl border border-white/10 bg-gradient-to-r from-[#161616] via-[#131313] to-[#161616] px-5 py-4 sm:px-6">
+        <div className="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-amber-500/60 via-amber-500/30 to-transparent" aria-hidden />
+        <div className="relative flex items-start gap-4 pl-2 sm:pl-3">
+          <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg border border-white/10 bg-amber-500/10 text-amber-500">
+            <Clock size={18} strokeWidth={1.75} aria-hidden />
+          </div>
+          <div className="min-w-0 pt-0.5">
+            <p className="text-sm font-semibold text-neutral-100">Operational next steps</p>
+            <p className="mt-1.5 text-sm leading-relaxed text-neutral-500">
+              KPI tiles use live invoice and bill balances when a finance workspace is resolved. Bump{" "}
+              <code className="rounded bg-white/[0.06] px-1.5 py-0.5 text-xs text-neutral-300">
+                WATCHMAN_DEPLOYED_MIGRATION_PACK
+              </code>{" "}
+              in{" "}
+              <code className="rounded bg-white/[0.06] px-1.5 py-0.5 text-xs text-neutral-300">
+                lib/constants/watchman-migrations.ts
+              </code>{" "}
+              when you apply packs. For ESCT Holdings / ESCT entity bootstrap, run migrations through Pack 001 onward, then{" "}
+              <code className="rounded bg-white/[0.06] px-1.5 py-0.5 text-xs text-neutral-300">
+                npm run greenfield:bootstrap
+              </code>
+              .
+            </p>
+          </div>
         </div>
       </div>
     </div>

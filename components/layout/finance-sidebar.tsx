@@ -237,8 +237,8 @@ export function FinanceSidebar() {
 
   return (
     <aside
-      className="flex flex-col w-56 border-r border-white/8 bg-[#0d0d0d] overflow-y-auto
-                 flex-shrink-0"
+      className="flex flex-col w-56 border-r border-white/8 bg-[#0d0d0d]/95 backdrop-blur-md overflow-y-auto
+                 flex-shrink-0 supports-[backdrop-filter]:bg-[#0d0d0d]/88"
     >
       {/* Logo */}
       <Link
@@ -275,10 +275,10 @@ export function FinanceSidebar() {
                       href={item.href}
                       className={`
                         flex items-center gap-2.5 px-2 py-1.5 rounded-md text-sm
-                        transition-colors group
+                        transition-all duration-200 ease-out group motion-safe:active:scale-[0.98]
                         ${active
-                          ? "bg-amber-500/10 text-amber-400"
-                          : "text-neutral-400 hover:text-neutral-200 hover:bg-white/5"
+                          ? "bg-amber-500/10 text-amber-400 shadow-[inset_0_0_0_1px_rgba(245,158,11,0.12)]"
+                          : "text-neutral-400 hover:text-neutral-200 hover:bg-white/5 hover:translate-x-0.5"
                         }
                       `}
                     >

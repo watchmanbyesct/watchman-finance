@@ -81,10 +81,63 @@ html, body {
   border-radius: 4px;
 }
 
+/* Motion (respect reduced-motion in utilities below) */
+/* Transform only — never hide content with opacity + fill-mode (can stick invisible if animation does not run). */
+@keyframes wf-page-enter {
+  from {
+    transform: translateY(6px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes wf-palette-in {
+  from {
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes wf-login-card-in {
+  from {
+    transform: translateY(12px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.wf-app-shell {
+  background-color: var(--onyx-900);
+  background-image:
+    radial-gradient(ellipse 100% 60% at 50% -15%, rgba(245, 158, 11, 0.09), transparent 50%),
+    linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: 100% 100%, 28px 28px, 28px 28px;
+}
+
+.wf-page-enter {
+  animation: wf-page-enter 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.wf-palette-panel-in {
+  animation: wf-palette-in 0.22s ease-out both;
+}
+
+.wf-login-card-in {
+  animation: wf-login-card-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
 /* Finance table utility classes */
 @layer components {
   .wf-card {
-    @apply rounded-lg border bg-[#141414] border-white/10 p-5;
+    @apply rounded-lg border bg-[#141414] border-white/10 p-5
+           transition-[border-color,box-shadow,transform] duration-300 ease-out
+           motion-safe:hover:border-amber-500/20 motion-safe:hover:shadow-[0_12px_40px_-16px_rgba(0,0,0,0.75)]
+           motion-safe:hover:-translate-y-0.5;
   }
 
   .wf-card-gold {
@@ -199,5 +252,19 @@ html, body {
 
   .wf-stat-change-down {
     @apply text-xs text-red-400 font-medium;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wf-page-enter,
+  .wf-palette-panel-in,
+  .wf-login-card-in {
+    animation: none !important;
+    transform: none !important;
+  }
+
+  .wf-card {
+    transition: none !important;
+    transform: none !important;
   }
 }

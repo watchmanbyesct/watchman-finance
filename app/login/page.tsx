@@ -8,7 +8,7 @@ export const metadata = {
 
 export default function LoginPage() {
   return (
-    <main className="min-h-screen flex items-center justify-center bg-[#0d0d0d] px-4">
+    <main className="min-h-screen flex items-center justify-center wf-app-shell px-4">
       <div className="w-full max-w-sm">
         {/* Brand */}
         <div className="mb-10 text-center">
@@ -22,7 +22,7 @@ export default function LoginPage() {
         </div>
 
         {/* Card */}
-        <div className="rounded-xl border border-white/10 bg-[#141414] p-8">
+        <div className="rounded-xl border border-white/10 bg-[#141414] p-8 wf-login-card-in shadow-xl shadow-black/40 transition-shadow duration-300 hover:shadow-2xl hover:shadow-black/50">
           <Suspense fallback={<p className="text-sm text-neutral-500">Loading…</p>}>
             <LoginForm />
           </Suspense>

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { FinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
@@ -23,22 +24,56 @@ const input =
 
 type CatItem = { id: string; item_code: string; item_name: string };
 
-export function CatalogCategoryForm({ workspace }: { workspace: FinanceWorkspace }) {
+function Pack013FormGate({
+  allowed,
+  moduleKey,
+  permissionCodes,
+  children,
+}: {
+  allowed: boolean;
+  moduleKey: "catalog" | "billing";
+  permissionCodes: string;
+  children: React.ReactNode;
+}) {
+  if (allowed) return <>{children}</>;
+  return (
+    <div className="wf-card border-amber-500/15 bg-amber-950/10 space-y-2">
+      <p className="text-sm font-medium text-amber-200/90">This form is not available for your role</p>
+      <p className="text-xs text-neutral-500 leading-relaxed">
+        Requires the <span className="text-neutral-300">{moduleKey}</span> module entitlement and{" "}
+        <code className="text-[11px] text-neutral-300">{permissionCodes}</code>{" "}
+        (Pack 013).{" "}
+        <Link href="/finance/pack-013" className="text-amber-500 hover:text-amber-400">
+          Permissions map
+        </Link>
+      </p>
+    </div>
+  );
+}
+
+export function CatalogCategoryForm({
+  workspace,
+  canManage = false,
+}: {
+  workspace: FinanceWorkspace;
+  canManage?: boolean;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   return (
-    <div className="wf-card space-y-3">
-      <h2 className="text-sm font-medium text-neutral-200">Add catalog category</h2>
-      {msg && <p className="text-xs text-amber-400">{msg}</p>}
-      <form
-        className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const fd = new FormData(e.currentTarget);
-          start(async () => {
-            setMsg(null);
-            const res = await createCatalogCategory({
+    <Pack013FormGate allowed={canManage} moduleKey="catalog" permissionCodes="catalog.category.manage">
+      <div className="wf-card space-y-3">
+        <h2 className="text-sm font-medium text-neutral-200">Add catalog category</h2>
+        {msg && <p className="text-xs text-amber-400">{msg}</p>}
+        <form
+          className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            start(async () => {
+              setMsg(null);
+              const res = await createCatalogCategory({
               tenantId: workspace.tenantId,
               entityId: workspace.entityId,
               categoryCode: String(fd.get("categoryCode") ?? "").trim(),
@@ -49,43 +84,51 @@ export function CatalogCategoryForm({ workspace }: { workspace: FinanceWorkspace
               (e.target as HTMLFormElement).reset();
               router.refresh();
             }
-          });
-        }}
-      >
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Category code</span>
-          <input name="categoryCode" required className={input} />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Category name</span>
-          <input name="categoryName" required className={input} />
-        </label>
-        <div className="md:col-span-2">
-          <button type="submit" disabled={pending} className="rounded-md bg-amber-600/90 px-4 py-2 text-sm font-medium text-black">
-            {pending ? "Saving…" : "Create category"}
-          </button>
-        </div>
-      </form>
-    </div>
+            });
+          }}
+        >
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Category code</span>
+            <input name="categoryCode" required className={input} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Category name</span>
+            <input name="categoryName" required className={input} />
+          </label>
+          <div className="md:col-span-2">
+            <button type="submit" disabled={pending} className="rounded-md bg-amber-600/90 px-4 py-2 text-sm font-medium text-black">
+              {pending ? "Saving…" : "Create category"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Pack013FormGate>
   );
 }
 
-export function CatalogItemForm({ workspace }: { workspace: FinanceWorkspace }) {
+export function CatalogItemForm({
+  workspace,
+  canManage = false,
+}: {
+  workspace: FinanceWorkspace;
+  canManage?: boolean;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   return (
-    <div className="wf-card space-y-3">
-      <h2 className="text-sm font-medium text-neutral-200">Add catalog item</h2>
-      {msg && <p className="text-xs text-amber-400">{msg}</p>}
-      <form
-        className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const fd = new FormData(e.currentTarget);
-          start(async () => {
-            setMsg(null);
-            const res = await createCatalogItem({
+    <Pack013FormGate allowed={canManage} moduleKey="catalog" permissionCodes="catalog.item.manage">
+      <div className="wf-card space-y-3">
+        <h2 className="text-sm font-medium text-neutral-200">Add catalog item</h2>
+        {msg && <p className="text-xs text-amber-400">{msg}</p>}
+        <form
+          className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            start(async () => {
+              setMsg(null);
+              const res = await createCatalogItem({
               tenantId: workspace.tenantId,
               entityId: workspace.entityId,
               itemCode: String(fd.get("itemCode") ?? "").trim(),
@@ -105,69 +148,73 @@ export function CatalogItemForm({ workspace }: { workspace: FinanceWorkspace }) 
               (e.target as HTMLFormElement).reset();
               router.refresh();
             }
-          });
-        }}
-      >
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Item code</span>
-          <input name="itemCode" required className={input} />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Item name</span>
-          <input name="itemName" required className={input} />
-        </label>
-        <label className="flex flex-col gap-1 md:col-span-2">
-          <span className="text-neutral-500 text-xs">Description</span>
-          <input name="description" className={input} />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Item type</span>
-          <select name="itemTypeCode" className={input}>
-            <option value="service">service</option>
-            <option value="product">product</option>
-            <option value="fee">fee</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Billing method</span>
-          <select name="billingMethod" className={input}>
-            <option value="flat_fee">flat_fee</option>
-            <option value="hourly">hourly</option>
-            <option value="quantity">quantity</option>
-          </select>
-        </label>
-        <div className="md:col-span-2">
-          <button type="submit" disabled={pending} className="rounded-md bg-amber-600/90 px-4 py-2 text-sm font-medium text-black">
-            {pending ? "Saving…" : "Create item"}
-          </button>
-        </div>
-      </form>
-    </div>
+            });
+          }}
+        >
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Item code</span>
+            <input name="itemCode" required className={input} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Item name</span>
+            <input name="itemName" required className={input} />
+          </label>
+          <label className="flex flex-col gap-1 md:col-span-2">
+            <span className="text-neutral-500 text-xs">Description</span>
+            <input name="description" className={input} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Item type</span>
+            <select name="itemTypeCode" className={input}>
+              <option value="service">service</option>
+              <option value="product">product</option>
+              <option value="fee">fee</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Billing method</span>
+            <select name="billingMethod" className={input}>
+              <option value="flat_fee">flat_fee</option>
+              <option value="hourly">hourly</option>
+              <option value="quantity">quantity</option>
+            </select>
+          </label>
+          <div className="md:col-span-2">
+            <button type="submit" disabled={pending} className="rounded-md bg-amber-600/90 px-4 py-2 text-sm font-medium text-black">
+              {pending ? "Saving…" : "Create item"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Pack013FormGate>
   );
 }
 
 export function CatalogPriceForm({
   workspace,
   catalogItems,
+  canManage = false,
 }: {
   workspace: FinanceWorkspace;
   catalogItems: CatItem[];
+  canManage?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   return (
-    <div className="wf-card space-y-3">
-      <h2 className="text-sm font-medium text-neutral-200">Add catalog price</h2>
-      {msg && <p className="text-xs text-amber-400">{msg}</p>}
-      <form
-        className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const fd = new FormData(e.currentTarget);
-          start(async () => {
-            setMsg(null);
-            const res = await createCatalogItemPrice({
+    <Pack013FormGate allowed={canManage} moduleKey="catalog" permissionCodes="catalog.price.manage">
+      <div className="wf-card space-y-3">
+        <h2 className="text-sm font-medium text-neutral-200">Add catalog item price</h2>
+        {msg && <p className="text-xs text-amber-400">{msg}</p>}
+        <form
+          className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            start(async () => {
+              setMsg(null);
+              const res = await createCatalogItemPrice({
               tenantId: workspace.tenantId,
               entityId: workspace.entityId,
               catalogItemId: String(fd.get("catalogItemId") ?? ""),
@@ -181,62 +228,70 @@ export function CatalogPriceForm({
               (e.target as HTMLFormElement).reset();
               router.refresh();
             }
-          });
-        }}
-      >
-        <label className="flex flex-col gap-1 md:col-span-2">
-          <span className="text-neutral-500 text-xs">Catalog item</span>
-          <select name="catalogItemId" required className={input}>
-            <option value="">Select…</option>
-            {catalogItems.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.item_code} — {c.item_name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Price name</span>
-          <input name="priceName" required className={input} placeholder="List" />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Unit price</span>
-          <input name="unitPrice" type="number" step="0.01" required className={input} />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Effective start</span>
-          <input name="effectiveStartDate" type="date" required className={input} />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Effective end</span>
-          <input name="effectiveEndDate" type="date" className={input} />
-        </label>
-        <div className="md:col-span-2">
-          <button type="submit" disabled={pending || !catalogItems.length} className="rounded-md bg-amber-600/90 px-4 py-2 text-sm font-medium text-black">
-            {pending ? "Saving…" : "Create price"}
-          </button>
-        </div>
-      </form>
-    </div>
+            });
+          }}
+        >
+          <label className="flex flex-col gap-1 md:col-span-2">
+            <span className="text-neutral-500 text-xs">Catalog item</span>
+            <select name="catalogItemId" required className={input}>
+              <option value="">Select…</option>
+              {catalogItems.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.item_code} — {c.item_name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Price name</span>
+            <input name="priceName" required className={input} placeholder="List" />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Unit price</span>
+            <input name="unitPrice" type="number" step="0.01" required className={input} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Effective start</span>
+            <input name="effectiveStartDate" type="date" required className={input} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Effective end</span>
+            <input name="effectiveEndDate" type="date" className={input} />
+          </label>
+          <div className="md:col-span-2">
+            <button type="submit" disabled={pending || !catalogItems.length} className="rounded-md bg-amber-600/90 px-4 py-2 text-sm font-medium text-black">
+              {pending ? "Saving…" : "Create price"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Pack013FormGate>
   );
 }
 
-export function BillingRuleForm({ workspace }: { workspace: FinanceWorkspace }) {
+export function BillingRuleForm({
+  workspace,
+  canManage = false,
+}: {
+  workspace: FinanceWorkspace;
+  canManage?: boolean;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   return (
-    <div className="wf-card space-y-3">
-      <h2 className="text-sm font-medium text-neutral-200">Add billing rule</h2>
-      {msg && <p className="text-xs text-amber-400">{msg}</p>}
-      <form
-        className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const fd = new FormData(e.currentTarget);
-          start(async () => {
-            setMsg(null);
-            const res = await createBillingRule({
+    <Pack013FormGate allowed={canManage} moduleKey="billing" permissionCodes="billing.rule.manage">
+      <div className="wf-card space-y-3">
+        <h2 className="text-sm font-medium text-neutral-200">Add billing rule</h2>
+        {msg && <p className="text-xs text-amber-400">{msg}</p>}
+        <form
+          className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            start(async () => {
+              setMsg(null);
+              const res = await createBillingRule({
               tenantId: workspace.tenantId,
               entityId: workspace.entityId,
               ruleCode: String(fd.get("ruleCode") ?? "").trim(),
@@ -255,46 +310,47 @@ export function BillingRuleForm({ workspace }: { workspace: FinanceWorkspace }) 
               (e.target as HTMLFormElement).reset();
               router.refresh();
             }
-          });
-        }}
-      >
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Rule code</span>
-          <input name="ruleCode" required className={input} />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Rule name</span>
-          <input name="ruleName" required className={input} />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Trigger</span>
-          <select name="billingTrigger" className={input}>
-            <option value="manual">manual</option>
-            <option value="service_event">service_event</option>
-            <option value="recurring">recurring</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Frequency</span>
-          <select name="billingFrequency" className={input}>
-            <option value="one_time">one_time</option>
-            <option value="monthly">monthly</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 md:col-span-2">
-          <span className="text-neutral-500 text-xs">Rate source</span>
-          <select name="rateSource" className={input}>
-            <option value="catalog">catalog</option>
-            <option value="manual">manual</option>
-          </select>
-        </label>
-        <div className="md:col-span-2">
-          <button type="submit" disabled={pending} className="rounded-md bg-amber-600/90 px-4 py-2 text-sm font-medium text-black">
-            {pending ? "Saving…" : "Create rule"}
-          </button>
-        </div>
-      </form>
-    </div>
+            });
+          }}
+        >
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Rule code</span>
+            <input name="ruleCode" required className={input} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Rule name</span>
+            <input name="ruleName" required className={input} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Trigger</span>
+            <select name="billingTrigger" className={input}>
+              <option value="manual">manual</option>
+              <option value="service_event">service_event</option>
+              <option value="recurring">recurring</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Frequency</span>
+            <select name="billingFrequency" className={input}>
+              <option value="one_time">one_time</option>
+              <option value="monthly">monthly</option>
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 md:col-span-2">
+            <span className="text-neutral-500 text-xs">Rate source</span>
+            <select name="rateSource" className={input}>
+              <option value="catalog">catalog</option>
+              <option value="manual">manual</option>
+            </select>
+          </label>
+          <div className="md:col-span-2">
+            <button type="submit" disabled={pending} className="rounded-md bg-amber-600/90 px-4 py-2 text-sm font-medium text-black">
+              {pending ? "Saving…" : "Create rule"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Pack013FormGate>
   );
 }
 
@@ -308,27 +364,33 @@ type BillingExceptionOpt = {
 export function BillingExceptionResolveForm({
   workspace,
   openExceptions,
+  canManage = false,
 }: {
   workspace: FinanceWorkspace;
   openExceptions: BillingExceptionOpt[];
+  canManage?: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
 
   return (
-    <div className="wf-card space-y-3">
-      <h2 className="text-sm font-medium text-neutral-200">Resolve billing exception</h2>
-      <p className="text-xs text-neutral-500">Requires billing.rule.manage. Marks the row resolved or ignored and sets resolved_at.</p>
-      {msg && <p className="text-xs text-amber-400">{msg}</p>}
-      <form
-        className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const fd = new FormData(e.currentTarget);
-          start(async () => {
-            setMsg(null);
-            const res = await resolveBillingException({
+    <Pack013FormGate allowed={canManage} moduleKey="billing" permissionCodes="billing.rule.manage">
+      <div className="wf-card space-y-3">
+        <h2 className="text-sm font-medium text-neutral-200">Resolve billing exception</h2>
+        <p className="text-xs text-neutral-500">
+          Pack 013: <code className="text-neutral-400">billing.rule.manage</code>. Marks the row resolved or ignored and
+          sets <code className="text-neutral-400">resolved_at</code>.
+        </p>
+        {msg && <p className="text-xs text-amber-400">{msg}</p>}
+        <form
+          className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            start(async () => {
+              setMsg(null);
+              const res = await resolveBillingException({
               tenantId: workspace.tenantId,
               exceptionId: String(fd.get("exceptionId") ?? ""),
               resolutionStatus: String(fd.get("resolutionStatus") ?? "resolved") as "resolved" | "ignored",
@@ -338,58 +400,66 @@ export function BillingExceptionResolveForm({
               (e.target as HTMLFormElement).reset();
               router.refresh();
             }
-          });
-        }}
-      >
-        <label className="flex flex-col gap-1 md:col-span-2">
-          <span className="text-neutral-500 text-xs">Open exception</span>
-          <select name="exceptionId" required className={input} disabled={!openExceptions.length}>
-            <option value="">Select…</option>
-            {openExceptions.map((x) => (
-              <option key={x.id} value={x.id}>
-                {x.exception_code} — {String(x.exception_message).slice(0, 60)}
-                {String(x.exception_message).length > 60 ? "…" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 md:col-span-2">
-          <span className="text-neutral-500 text-xs">Resolution</span>
-          <select name="resolutionStatus" className={input}>
-            <option value="resolved">resolved</option>
-            <option value="ignored">ignored</option>
-          </select>
-        </label>
-        <div className="md:col-span-2">
-          <button
-            type="submit"
-            disabled={pending || !openExceptions.length}
-            className="rounded-md bg-amber-600/90 px-4 py-2 text-sm font-medium text-black"
-          >
-            {pending ? "Saving…" : "Apply resolution"}
-          </button>
-        </div>
-      </form>
-    </div>
+            });
+          }}
+        >
+          <label className="flex flex-col gap-1 md:col-span-2">
+            <span className="text-neutral-500 text-xs">Open exception</span>
+            <select name="exceptionId" required className={input} disabled={!openExceptions.length}>
+              <option value="">Select…</option>
+              {openExceptions.map((x) => (
+                <option key={x.id} value={x.id}>
+                  {x.exception_code} — {String(x.exception_message).slice(0, 60)}
+                  {String(x.exception_message).length > 60 ? "…" : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="flex flex-col gap-1 md:col-span-2">
+            <span className="text-neutral-500 text-xs">Resolution</span>
+            <select name="resolutionStatus" className={input}>
+              <option value="resolved">resolved</option>
+              <option value="ignored">ignored</option>
+            </select>
+          </label>
+          <div className="md:col-span-2">
+            <button
+              type="submit"
+              disabled={pending || !openExceptions.length}
+              className="rounded-md bg-amber-600/90 px-4 py-2 text-sm font-medium text-black"
+            >
+              {pending ? "Saving…" : "Apply resolution"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Pack013FormGate>
   );
 }
 
-export function BillableCandidateForm({ workspace }: { workspace: FinanceWorkspace }) {
+export function BillableCandidateForm({
+  workspace,
+  canManage = false,
+}: {
+  workspace: FinanceWorkspace;
+  canManage?: boolean;
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   return (
-    <div className="wf-card space-y-3">
-      <h2 className="text-sm font-medium text-neutral-200">Record billable candidate</h2>
-      {msg && <p className="text-xs text-amber-400">{msg}</p>}
-      <form
-        className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm"
-        onSubmit={(e) => {
-          e.preventDefault();
-          const fd = new FormData(e.currentTarget);
-          start(async () => {
-            setMsg(null);
-            const res = await createBillableEventCandidate({
+    <Pack013FormGate allowed={canManage} moduleKey="billing" permissionCodes="billing.candidate.manage">
+      <div className="wf-card space-y-3">
+        <h2 className="text-sm font-medium text-neutral-200">Record billable candidate</h2>
+        {msg && <p className="text-xs text-amber-400">{msg}</p>}
+        <form
+          className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            start(async () => {
+              setMsg(null);
+              const res = await createBillableEventCandidate({
               tenantId: workspace.tenantId,
               entityId: workspace.entityId,
               sourceTable: String(fd.get("sourceTable") ?? "").trim(),
@@ -403,36 +473,37 @@ export function BillableCandidateForm({ workspace }: { workspace: FinanceWorkspa
               (e.target as HTMLFormElement).reset();
               router.refresh();
             }
-          });
-        }}
-      >
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Source table</span>
-          <input name="sourceTable" required className={input} placeholder="shifts" />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Source record id</span>
-          <input name="sourceRecordId" required className={input} />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Quantity</span>
-          <input name="quantity" type="number" step="0.01" defaultValue={1} className={input} />
-        </label>
-        <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">Candidate date</span>
-          <input name="candidateDate" type="date" className={input} />
-        </label>
-        <label className="flex flex-col gap-1 md:col-span-2">
-          <span className="text-neutral-500 text-xs">Notes</span>
-          <input name="notes" className={input} />
-        </label>
-        <div className="md:col-span-2">
-          <button type="submit" disabled={pending} className="rounded-md bg-amber-600/90 px-4 py-2 text-sm font-medium text-black">
-            {pending ? "Saving…" : "Create candidate"}
-          </button>
-        </div>
-      </form>
-    </div>
+            });
+          }}
+        >
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Source table</span>
+            <input name="sourceTable" required className={input} placeholder="shifts" />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Source record id</span>
+            <input name="sourceRecordId" required className={input} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Quantity</span>
+            <input name="quantity" type="number" step="0.01" defaultValue={1} className={input} />
+          </label>
+          <label className="flex flex-col gap-1">
+            <span className="text-neutral-500 text-xs">Candidate date</span>
+            <input name="candidateDate" type="date" className={input} />
+          </label>
+          <label className="flex flex-col gap-1 md:col-span-2">
+            <span className="text-neutral-500 text-xs">Notes</span>
+            <input name="notes" className={input} />
+          </label>
+          <div className="md:col-span-2">
+            <button type="submit" disabled={pending} className="rounded-md bg-amber-600/90 px-4 py-2 text-sm font-medium text-black">
+              {pending ? "Saving…" : "Create candidate"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </Pack013FormGate>
   );
 }
 
