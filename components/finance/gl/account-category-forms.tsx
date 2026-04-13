@@ -3,8 +3,17 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { FinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
+import type { ActionResult } from "@/lib/errors/app-error";
 import { createAccountCategory, seedQbdAccountCategories } from "@/modules/finance-core/actions/finance-core-actions";
 import { QBD_ACCOUNT_TYPE_VALUES } from "@/lib/finance/account-pack025-metadata";
+
+/** Prefer the real server/DB message when the wrapper only shows a generic internal_error. */
+function actionUserMessage(res: ActionResult<unknown>): string {
+  if (res.success) return res.message;
+  const err0 = res.errors?.[0];
+  if (err0?.code === "internal_error" && err0.message) return err0.message;
+  return res.message;
+}
 
 const input =
   "rounded-md border border-white/10 bg-white/5 px-3 py-2 text-neutral-200 text-sm focus:outline-none focus:ring-1 focus:ring-amber-500/40";
@@ -32,7 +41,7 @@ export function QbdAccountCategorySeedButton({ workspace }: { workspace: Finance
         onClick={() => {
           start(async () => {
             const res = await seedQbdAccountCategories({ tenantId: workspace.tenantId });
-            setMsg(res.message);
+            setMsg(actionUserMessage(res));
             if (res.success) router.refresh();
           });
         }}
@@ -79,7 +88,7 @@ export function CreateAccountCategoryForm({ workspace }: { workspace: FinanceWor
               normalBalance: String(fd.get("normalBalance") ?? "debit") as "debit" | "credit",
               qbdAccountType: qbdRaw ? (qbdRaw as (typeof QBD_ACCOUNT_TYPE_VALUES)[number]) : undefined,
             });
-            setMsg(res.message);
+            setMsg(actionUserMessage(res));
             if (res.success) {
               (e.target as HTMLFormElement).reset();
               router.refresh();

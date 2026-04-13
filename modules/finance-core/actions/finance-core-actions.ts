@@ -457,7 +457,14 @@ export async function seedQbdAccountCategories(
     }));
 
     const { error } = await admin.from("account_categories").upsert(rows, { onConflict: "tenant_id,code" });
-    if (error) throw new Error(error.message);
+    if (error) {
+      console.error("[seedQbdAccountCategories]", error.message, error);
+      return {
+        success: false,
+        message: error.message,
+        errors: [{ code: "integration_error", message: error.message }],
+      };
+    }
 
     await writeAuditLog({
       tenantId: v.tenantId,

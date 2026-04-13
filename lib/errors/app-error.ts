@@ -35,6 +35,15 @@ export interface ActionResult<T = undefined> {
 export function mapErrorToResult<T = undefined>(err: unknown): ActionResult<T> {
   const message = err instanceof Error ? err.message : "internal_error";
 
+  if (message.startsWith("context_error:")) {
+    return {
+      success: false,
+      message:
+        "We could not verify your access to this organization. Try signing out and back in, or contact support if this persists.",
+      errors: [{ code: "context_error", message }],
+    };
+  }
+
   if (message.startsWith("forbidden:")) {
     return {
       success: false,
