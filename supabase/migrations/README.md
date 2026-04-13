@@ -42,7 +42,7 @@ Paste each file into the SQL Editor in the Supabase Dashboard in order.
 
 ## After Migration
 
-Run the bootstrap script to seed the EST Holdings tenant and admin user:
+Run the bootstrap script to seed the ESCT Holdings tenant and admin user:
 
 ```bash
 npm run greenfield:bootstrap -- \

@@ -298,7 +298,7 @@ export function FinanceSidebar() {
             <span className="text-amber-400 font-bold text-[9px]">EST</span>
           </div>
           <div className="min-w-0">
-            <p className="text-xs font-medium text-neutral-300 truncate">EST Holdings</p>
+            <p className="text-xs font-medium text-neutral-300 truncate">ESCT Holdings</p>
             <p className="text-[10px] text-neutral-600 truncate">ESCT Entity</p>
           </div>
         </div>

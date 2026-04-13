@@ -13,13 +13,13 @@
  *   2. Verify Supabase connection
  *   3. Create the bootstrap admin user in Supabase Auth
  *   4. Create the platform_user record
- *   5. Create the EST Holdings tenant
+ *   5. Create the ESCT Holdings tenant
  *   6. Create the ESCT entity under the tenant
  *   7. Create the tenant membership for the admin user + default user_entity_scope
  *   8. Seed system roles
  *   9. Seed system permissions, then link tenant_owner to all permissions (role_permissions)
  *  10. Assign tenant_owner role to the bootstrap user
- *  11. Seed module entitlements (all modules enabled for ESCT)
+ *  11. Seed module entitlements (all modules enabled for the ESCT Holdings tenant)
  *  12. Seed account categories
  *  13. Write bootstrap audit record
  *  14. Print summary and next steps
@@ -242,7 +242,7 @@ async function main() {
   }
 
   // ── Step 4: Create tenant ─────────────────────────────────────────────────
-  section("Step 4. Creating EST Holdings tenant");
+  section("Step 4. Creating ESCT Holdings tenant");
   let tenantId;
 
   const { data: existingTenant } = await admin
@@ -259,8 +259,8 @@ async function main() {
       .from("tenants")
       .insert({
         slug: "est-holdings",
-        legal_name: "EST Holdings",
-        display_name: "EST Holdings",
+        legal_name: "ESCT Holdings",
+        display_name: "ESCT Holdings",
         timezone: "America/New_York",
         status: "active",
       })
@@ -268,7 +268,7 @@ async function main() {
       .single();
     if (tenantError) fatal("Failed to create tenant: " + tenantError.message);
     tenantId = tenantData.id;
-    log(`Tenant created: EST Holdings (${tenantId})`);
+    log(`Tenant created: ESCT Holdings (${tenantId})`);
   }
 
   // ── Step 5: Create ESCT entity ────────────────────────────────────────────
@@ -399,7 +399,7 @@ async function main() {
   }
 
   // ── Step 10: Seed module entitlements ────────────────────────────────────
-  section("Step 10. Enabling all finance modules for EST Holdings");
+  section("Step 10. Enabling all finance modules for ESCT Holdings");
   for (const moduleKey of MODULE_KEYS) {
     const { error } = await admin.from("tenant_module_entitlements").upsert(
       { tenant_id: tenantId, module_key: moduleKey, is_enabled: true },
@@ -440,7 +440,7 @@ async function main() {
   console.log("\n╔══════════════════════════════════════════════════════════════╗");
   console.log("║               BOOTSTRAP COMPLETE                            ║");
   console.log("╚══════════════════════════════════════════════════════════════╝\n");
-  console.log("  Tenant:         EST Holdings (est-holdings)");
+  console.log("  Tenant:         ESCT Holdings (est-holdings)");
   console.log("  Tenant ID:      " + tenantId);
   console.log("  Entity:         ESCT");
   console.log("  Entity ID:      " + entityId);

@@ -18,7 +18,7 @@ export default function LoginPage() {
             Finance
           </h1>
           <p className="mt-2 text-sm text-neutral-500">
-            Financial operating system for EST Holdings
+            Financial operating system for ESCT Holdings
           </p>
         </div>
 

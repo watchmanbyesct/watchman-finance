@@ -11,6 +11,15 @@ export const metadata = { title: "Dashboard — Watchman Finance" };
 
 const PACK = WATCHMAN_DEPLOYED_MIGRATION_PACK;
 
+type SetupChecklistItem = {
+  label: string;
+  complete: boolean;
+  href: string | null;
+  /** When incomplete and there is no href, shown instead of the generic migration label. */
+  pendingNote?: string;
+  pendingTitle?: string;
+};
+
 function formatUsd(n: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
 }
@@ -78,7 +87,7 @@ function statsFromMetrics(m: FinanceDashboardMetrics) {
   ];
 }
 
-const SETUP_CHECKLIST = [
+const SETUP_CHECKLIST: SetupChecklistItem[] = [
   { label: "Pack 001 — Foundation (GL, org, audit)", complete: PACK >= 1, href: null },
   { label: "Pack 002 — Integration staging", complete: PACK >= 2, href: "/finance/integration" },
   { label: "Pack 003 — AR & AP core", complete: PACK >= 3, href: "/finance/ar-ap" },
@@ -102,8 +111,22 @@ const SETUP_CHECKLIST = [
     complete: PACK >= 23,
     href: "/finance/evidence",
   },
-  { label: "EST Holdings tenant created", complete: false, href: null },
-  { label: "ESCT entity created", complete: false, href: null },
+  {
+    label: "ESCT Holdings tenant created",
+    complete: false,
+    href: null,
+    pendingNote: "Migrations + bootstrap",
+    pendingTitle:
+      "Apply Watchman Finance SQL packs (Pack 001 onward) to Supabase, then run npm run greenfield:bootstrap to create the ESCT Holdings tenant.",
+  },
+  {
+    label: "ESCT entity — Enterprise Security Consulting and Training Inc.",
+    complete: false,
+    href: null,
+    pendingNote: "Migrations + bootstrap",
+    pendingTitle:
+      "Apply SQL migrations through Pack 001+, then run npm run greenfield:bootstrap to create the ESCT entity (Enterprise Security Consulting and Training Inc.) under ESCT Holdings.",
+  },
   { label: "Chart of accounts seeded", complete: false, href: "/finance/accounts" },
   { label: "First fiscal period created", complete: false, href: "/finance/periods" },
   { label: "First customer added", complete: false, href: "/finance/ar/customers" },
@@ -173,7 +196,7 @@ export default async function FinanceDashboardPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="wf-page-title">Finance Dashboard</h1>
-          <p className="text-sm text-neutral-500 mt-1">{today} &mdash; EST Holdings / ESCT</p>
+          <p className="text-sm text-neutral-500 mt-1">{today} &mdash; ESCT Holdings / ESCT</p>
         </div>
         <div className="flex items-center gap-2">
           <span className="wf-badge wf-badge-success">
@@ -238,8 +261,12 @@ export default async function FinanceDashboardPage() {
                   </Link>
                 )}
                 {!item.complete && !item.href && (
-                  <span className="text-xs text-neutral-600 flex items-center gap-0.5">
-                    <AlertCircle size={9} /> Requires migration
+                  <span
+                    className="text-xs text-neutral-600 flex items-center gap-0.5 max-w-[11rem] text-right leading-snug"
+                    title={item.pendingTitle}
+                  >
+                    <AlertCircle size={9} className="flex-shrink-0" />
+                    {item.pendingNote ?? "Requires migration"}
                   </span>
                 )}
               </div>
@@ -299,7 +326,9 @@ export default async function FinanceDashboardPage() {
             KPI tiles above use live invoice and bill balances when you are signed in with a finance workspace. Bump{" "}
             <code className="text-xs text-neutral-400">WATCHMAN_DEPLOYED_MIGRATION_PACK</code> in{" "}
             <code className="text-xs text-neutral-400">lib/constants/watchman-migrations.ts</code> whenever you apply
-            additional packs so module banners stay accurate.
+            additional packs so module banners stay accurate. To stand up ESCT Holdings and the ESCT entity
+            (Enterprise Security Consulting and Training Inc.), apply the SQL migrations through Pack 001 onward, then run{" "}
+            <code className="text-xs text-neutral-400">npm run greenfield:bootstrap</code>.
           </p>
         </div>
       </div>

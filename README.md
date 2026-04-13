@@ -2,7 +2,7 @@
 
 Financial operating system for the Watchman ecosystem.
 
-Built for EST Holdings / ESCT. Multi-tenant and multi-entity from day one.
+Built for ESCT Holdings / ESCT. Multi-tenant and multi-entity from day one.
 
 ---
 
@@ -70,7 +70,7 @@ npm run greenfield:bootstrap -- \
   --name='Owens Shepard'
 ```
 
-This creates the EST Holdings tenant, ESCT entity, seeds all roles,
+This creates the ESCT Holdings tenant, ESCT entity (Enterprise Security Consulting and Training Inc.), seeds all roles,
 permissions, module entitlements, and account categories.
 
 ### 7. Start the dev server
