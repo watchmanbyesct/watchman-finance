@@ -9,6 +9,7 @@ import {
   assignUserRole,
   inviteUserToTenant,
   removeTenantMembership,
+  resetUserTemporaryPasswordAdmin,
   revokeUserRoleAssignment,
   updatePlatformUserAdmin,
   updateTenantMembershipAdmin,
@@ -483,6 +484,28 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
                       }}
                     >
                       Remove user
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded border border-amber-500/30 px-2 py-1 text-xs text-amber-300 hover:bg-amber-950/30"
+                      disabled={pending || !snapshot.canInvite}
+                      onClick={() => {
+                        runAction("Password reset", async () => {
+                          return resetUserTemporaryPasswordAdmin({
+                            tenantId,
+                            targetPlatformUserId: m.platformUserId,
+                          });
+                        }, (data) => {
+                          const temporaryPassword =
+                            (data as { temporaryPassword?: string } | undefined)?.temporaryPassword;
+                          if (temporaryPassword) {
+                            setIssuedTempCredential({ email: m.email, password: temporaryPassword });
+                            setShowIssuedTempPassword(false);
+                          }
+                        });
+                      }}
+                    >
+                      Reset temp password
                     </button>
                   </form>
                 </td>

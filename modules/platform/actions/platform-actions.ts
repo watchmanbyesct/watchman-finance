@@ -62,6 +62,12 @@ const RemoveTenantMembershipSchema = z.object({
   deactivatePlatformUser: z.boolean().default(false),
 });
 
+const ResetUserTemporaryPasswordSchema = z.object({
+  tenantId: z.string().uuid(),
+  targetPlatformUserId: z.string().uuid(),
+  temporaryPassword: z.string().min(8).max(128).optional(),
+});
+
 const RevokeUserRoleAssignmentSchema = z.object({
   tenantId:     z.string().uuid(),
   assignmentId: z.string().uuid(),
@@ -559,6 +565,77 @@ export async function removeTenantMembership(
 
     revalidatePath("/admin/users");
     return { success: true, message: "User removed from tenant." };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+/**
+ * Reset a member's auth password to a temporary value and flag first-login password change.
+ * Permission: user.invite
+ */
+export async function resetUserTemporaryPasswordAdmin(
+  input: z.infer<typeof ResetUserTemporaryPasswordSchema>,
+): Promise<ActionResult<{ temporaryPassword: string }>> {
+  try {
+    const parsed = ResetUserTemporaryPasswordSchema.parse(input);
+    const ctx = await resolveRequestContext(parsed.tenantId);
+    requirePermission(ctx, "user.invite");
+
+    const admin = createSupabaseAdminClient();
+    const password = parsed.temporaryPassword?.trim() || generateTemporaryPassword();
+
+    const { data: membership } = await admin
+      .from("tenant_memberships")
+      .select("id")
+      .eq("tenant_id", parsed.tenantId)
+      .eq("platform_user_id", parsed.targetPlatformUserId)
+      .maybeSingle();
+    if (!membership) return { success: false, message: "Membership not found for this tenant." };
+
+    const { data: pu } = await admin
+      .from("platform_users")
+      .select("id, auth_user_id")
+      .eq("id", parsed.targetPlatformUserId)
+      .single();
+    if (!pu?.auth_user_id) {
+      return { success: false, message: "Auth user id missing for this platform user." };
+    }
+
+    const { data: authUserResult, error: authReadErr } = await admin.auth.admin.getUserById(pu.auth_user_id);
+    if (authReadErr || !authUserResult?.user) {
+      return {
+        success: false,
+        message: `Could not load auth user: ${authReadErr?.message ?? "not found"}`,
+      };
+    }
+
+    const existingMeta = authUserResult.user.user_metadata ?? {};
+    const { error: updErr } = await admin.auth.admin.updateUserById(pu.auth_user_id, {
+      password,
+      user_metadata: {
+        ...existingMeta,
+        require_password_change: true,
+        require_password_change_at: new Date().toISOString(),
+      },
+    });
+    if (updErr) return { success: false, message: `Password reset failed: ${updErr.message}` };
+
+    await writeAuditLog({
+      tenantId: parsed.tenantId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "finance_core",
+      actionCode: "user.password.reset_temp",
+      targetTable: "platform_users",
+      targetRecordId: parsed.targetPlatformUserId,
+      newValues: { requirePasswordChange: true },
+    });
+
+    return {
+      success: true,
+      message: "Temporary password reset. Share it securely with the user.",
+      data: { temporaryPassword: password },
+    };
   } catch (err) {
     return mapErrorToResult(err);
   }
