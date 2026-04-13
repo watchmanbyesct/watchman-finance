@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { createSupabaseAdminClient } from "@/lib/db/supabase-server";
 import { resolveRequestContext } from "@/lib/context/resolve-request-context";
@@ -58,7 +59,13 @@ const InviteUserToTenantSchema = z.object({
   fullName:        z.string().min(1).max(200),
   defaultEntityId: z.string().uuid(),
   roleId:          z.string().uuid().optional(),
+  inviteMode:      z.enum(["email", "temporary_password"]).default("email"),
+  temporaryPassword: z.string().min(8).max(128).optional(),
 });
+
+function generateTemporaryPassword(): string {
+  return `${randomBytes(9).toString("base64url")}A1!`;
+}
 
 /**
  * Update entity metadata. Permission: entity.update
@@ -564,21 +571,44 @@ export async function inviteUserToTenant(
       (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
     ).replace(/\/$/, "");
 
-    const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(normalizedEmail, {
-      data: { full_name: parsed.fullName },
-      redirectTo: `${baseUrl}/auth/callback`,
-    });
+    const temporaryPassword =
+      parsed.inviteMode === "temporary_password"
+        ? (parsed.temporaryPassword?.trim() || generateTemporaryPassword())
+        : null;
 
-    if (inviteErr) {
-      return {
-        success: false,
-        message:
-          inviteErr.message ??
-          "Invite failed. If this address already has an account, add them with “Existing platform user” instead.",
-      };
+    let authUserId: string | undefined;
+    if (parsed.inviteMode === "temporary_password") {
+      const { data: created, error: createErr } = await admin.auth.admin.createUser({
+        email: normalizedEmail,
+        password: temporaryPassword!,
+        email_confirm: true,
+        user_metadata: { full_name: parsed.fullName },
+      });
+
+      if (createErr) {
+        return {
+          success: false,
+          message: `User creation failed: ${createErr.message}`,
+        };
+      }
+      authUserId = created.user?.id;
+    } else {
+      const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(normalizedEmail, {
+        data: { full_name: parsed.fullName },
+        redirectTo: `${baseUrl}/auth/callback`,
+      });
+
+      if (inviteErr) {
+        return {
+          success: false,
+          message:
+            inviteErr.message ??
+            "Invite failed. If this address already has an account, add them with “Existing platform user” instead.",
+        };
+      }
+      authUserId = inviteData.user?.id;
     }
 
-    const authUserId = inviteData.user?.id;
     if (!authUserId) return { success: false, message: "Invite did not return a user id." };
 
     const { error: puErr } = await admin.from("platform_users").upsert(
@@ -663,7 +693,10 @@ export async function inviteUserToTenant(
     revalidatePath("/admin/users");
     return {
       success: true,
-      message: "Invite sent. They will receive email to set a password (if your Supabase Auth templates are enabled).",
+      message:
+        parsed.inviteMode === "temporary_password"
+          ? `User created without email delivery. Temporary password: ${temporaryPassword}`
+          : "Invite sent. They will receive email to set a password (if your Supabase Auth templates are enabled).",
       data:    { authUserId },
     };
   } catch (err) {

@@ -22,6 +22,7 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
+  const [inviteMode, setInviteMode] = useState<"email" | "temporary_password">("email");
 
   function handleActionResult(result: {
     success: boolean;
@@ -88,8 +89,7 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
           <div>
             <h2 className="wf-section-title">Invite by email</h2>
             <p className="mt-1 text-xs text-neutral-500">
-              Sends a Supabase Auth invite. If the address already exists, use &quot;Existing platform user&quot;
-              below.
+              Supports either email invite or direct temporary-password setup when SMTP is unavailable.
             </p>
           </div>
           <form
@@ -101,6 +101,10 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
               const fullName = String(fd.get("invite_name") ?? "").trim();
               const defaultEntityId = String(fd.get("invite_entity") ?? "");
               const roleId = String(fd.get("invite_role") ?? "").trim();
+              const selectedInviteMode = String(fd.get("invite_mode") ?? "email") as
+                | "email"
+                | "temporary_password";
+              const temporaryPassword = String(fd.get("invite_temp_password") ?? "").trim();
               start(async () => {
                 const r = await inviteUserToTenant({
                   tenantId,
@@ -108,6 +112,8 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
                   fullName,
                   defaultEntityId,
                   roleId: roleId ? roleId : undefined,
+                  inviteMode: selectedInviteMode,
+                  temporaryPassword: selectedInviteMode === "temporary_password" ? temporaryPassword || undefined : undefined,
                 });
                 handleActionResult(r);
               });
@@ -115,6 +121,15 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
           >
             <input name="invite_email" type="email" required placeholder="Email" className="wf-input" />
             <input name="invite_name" type="text" required placeholder="Full name" className="wf-input" />
+            <select
+              name="invite_mode"
+              className="wf-input"
+              value={inviteMode}
+              onChange={(e) => setInviteMode(e.target.value as "email" | "temporary_password")}
+            >
+              <option value="email">Send email invite</option>
+              <option value="temporary_password">Set temporary password (no email)</option>
+            </select>
             <select name="invite_entity" required className="wf-input">
               {snapshot.entities.map((en) => (
                 <option key={en.id} value={en.id}>
@@ -122,6 +137,14 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
                 </option>
               ))}
             </select>
+            {inviteMode === "temporary_password" ? (
+              <input
+                name="invite_temp_password"
+                type="text"
+                placeholder="Temporary password (optional)"
+                className="wf-input sm:col-span-2"
+              />
+            ) : null}
             <select name="invite_role" className="wf-input">
               <option value="">No role yet</option>
               {snapshot.roles.map((role) => (
@@ -132,7 +155,9 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
             </select>
             <div className="sm:col-span-2 lg:col-span-4">
               <button type="submit" className="wf-btn-primary" disabled={pending}>
-                Send invite &amp; create membership
+                {inviteMode === "temporary_password"
+                  ? "Create user with temporary password"
+                  : "Send invite & create membership"}
               </button>
             </div>
           </form>
