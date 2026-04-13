@@ -173,7 +173,6 @@ export async function assignUserRole(
         platform_user_id:    parsed.targetPlatformUserId,
         role_id:             parsed.roleId,
         is_active:           true,
-        updated_at:          new Date().toISOString(),
       },
       { onConflict: "tenant_id,platform_user_id,role_id" }
     );
@@ -519,7 +518,7 @@ export async function removeTenantMembership(
 
     const { error: roleErr } = await admin
       .from("user_role_assignments")
-      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .update({ is_active: false })
       .eq("tenant_id", parsed.tenantId)
       .eq("platform_user_id", parsed.targetPlatformUserId)
       .eq("is_active", true);
@@ -589,7 +588,7 @@ export async function revokeUserRoleAssignment(
 
     const { error } = await admin
       .from("user_role_assignments")
-      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .update({ is_active: false })
       .eq("id", parsed.assignmentId);
 
     if (error) throw new Error(error.message);
@@ -685,7 +684,6 @@ export async function inviteUserToTenant(
             platform_user_id: existingPlatformUser.id,
             role_id: parsed.roleId,
             is_active: true,
-            updated_at: new Date().toISOString(),
           },
           { onConflict: "tenant_id,platform_user_id,role_id" },
         );
@@ -820,7 +818,6 @@ export async function inviteUserToTenant(
           platform_user_id: puRow.id,
           role_id:          parsed.roleId,
           is_active:        true,
-          updated_at:       new Date().toISOString(),
         },
         { onConflict: "tenant_id,platform_user_id,role_id" },
       );

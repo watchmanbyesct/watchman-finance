@@ -75,6 +75,13 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
   }
 
   const memberByUserId = new Map(snapshot.memberships.map((m) => [m.platformUserId, m]));
+  const activeRolesByUserId = new Map<string, string[]>();
+  for (const a of snapshot.assignments) {
+    if (!a.isActive) continue;
+    const list = activeRolesByUserId.get(a.platformUserId) ?? [];
+    list.push(a.roleName);
+    activeRolesByUserId.set(a.platformUserId, list);
+  }
 
   return (
     <div className="space-y-8">
@@ -357,6 +364,9 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
                 <td className="align-top">
                   <div className="font-medium text-neutral-200">{m.email}</div>
                   <div className="text-xs text-neutral-500">{m.fullName}</div>
+                  <div className="text-xs text-neutral-500 mt-1">
+                    Roles: {activeRolesByUserId.get(m.platformUserId)?.join(", ") ?? "No active role"}
+                  </div>
                   <div className="text-xs text-neutral-600 mt-1">
                     Default entity: {m.defaultEntityLabel ?? "—"}
                   </div>
