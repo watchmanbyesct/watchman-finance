@@ -1,3 +1,8 @@
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 "use client";
 
 import { useRouter } from "next/navigation";
@@ -11,7 +16,7 @@ export type AccountCategoryOption = {
   name: string;
   category_type: string;
   normal_balance: string;
-  qbd_account_type?: string | null;
+  integration_account_type?: string | null;
 };
 
 const TYPE_ORDER = ["asset", "liability", "equity", "revenue", "expense"] as const;
@@ -61,8 +66,8 @@ export function AccountCreateForm({
     <div className="wf-card">
       <h2 className="text-sm font-medium text-neutral-200 mb-4">Add account</h2>
       <p className="text-xs text-neutral-500 mb-4 leading-relaxed">
-        Pick a category first — GL account type, normal balance, and default QBD classification come from the
-        category (QuickBooks Desktop model). Seed QBD categories if the list is short.
+        Pick a category first — GL account type, normal balance, and default integration taxonomy come from the
+        category. Seed integration categories if the list is short.
       </p>
       {msg && <p className="text-xs text-amber-400 mb-3">{msg}</p>}
       <form
@@ -137,9 +142,9 @@ export function AccountCreateForm({
               <span className="text-neutral-200">{selected.normal_balance}</span>
             </p>
             <p>
-              <span className="text-neutral-500">Default QBD type:</span>{" "}
+              <span className="text-neutral-500">Default integration type:</span>{" "}
               <span className="text-neutral-200">
-                {selected.qbd_account_type ? fmt(selected.qbd_account_type) : "from GL type"}
+                {selected.integration_account_type ? fmt(selected.integration_account_type) : "from GL type"}
               </span>
             </p>
           </div>

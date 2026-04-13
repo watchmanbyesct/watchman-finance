@@ -1,41 +1,49 @@
 /**
- * QuickBooks Online OAuth 2.0 (Intuit) — token exchange and company metadata.
- * Used by Pack 002 integration routes (service-side only).
+ * External accounting provider OAuth 2.0 (Intuit developer platform) — token exchange and company metadata.
+ * Service-side only. Vendor API hostnames are dictated by the provider.
  */
 
 const INTUIT_AUTH_BASE = "https://appcenter.intuit.com/connect/oauth2";
 const INTUIT_TOKEN_URL = "https://oauth.platform.intuit.com/oauth2/v1/tokens";
 
-const CALLBACK_PATH = "/api/integrations/quickbooks/callback";
+/** Intuit accounting API bases (sandbox vs production). */
+const INTUIT_ACCOUNTING_API_PRODUCTION = "https://quickbooks.api.intuit.com";
+const INTUIT_ACCOUNTING_API_SANDBOX = "https://sandbox-quickbooks.api.intuit.com";
+
+export const ACCOUNTING_OAUTH_CALLBACK_PATH = "/api/integrations/accounting-oauth/callback";
 
 /**
- * OAuth redirect_uri must match exactly what Intuit shows in the app and what is sent on authorize + token.
- * If `QBO_REDIRECT_URI` is unset and `QBO_REDIRECT_USE_REQUEST_ORIGIN=1`, derive `{origin}{CALLBACK_PATH}` (useful for preview URLs).
+ * OAuth redirect_uri must match the developer app registration for both authorize and token requests.
+ * If `ACCOUNTING_OAUTH_REDIRECT_URI` is unset and `ACCOUNTING_OAUTH_REDIRECT_USE_REQUEST_ORIGIN=1`,
+ * use `{origin}{ACCOUNTING_OAUTH_CALLBACK_PATH}` (useful for preview URLs).
  */
-export function resolveQboRedirectUri(requestOrigin: string): string | null {
-  const explicit = process.env.QBO_REDIRECT_URI?.trim();
+export function resolveAccountingOAuthRedirectUri(requestOrigin: string): string | null {
+  const explicit = process.env.ACCOUNTING_OAUTH_REDIRECT_URI?.trim();
   if (explicit) return explicit;
-  if (process.env.QBO_REDIRECT_USE_REQUEST_ORIGIN === "1") {
+  if (process.env.ACCOUNTING_OAUTH_REDIRECT_USE_REQUEST_ORIGIN === "1") {
     const origin = requestOrigin.replace(/\/$/, "");
-    return `${origin}${CALLBACK_PATH}`;
+    return `${origin}${ACCOUNTING_OAUTH_CALLBACK_PATH}`;
   }
   return null;
 }
 
-export function getQboApiBase(): string {
-  return process.env.QBO_ENVIRONMENT === "production"
-    ? "https://quickbooks.api.intuit.com"
-    : "https://sandbox-quickbooks.api.intuit.com";
+export function getAccountingProviderApiBase(): string {
+  return process.env.ACCOUNTING_OAUTH_ENVIRONMENT === "production"
+    ? INTUIT_ACCOUNTING_API_PRODUCTION
+    : INTUIT_ACCOUNTING_API_SANDBOX;
 }
 
-export function buildQboAuthorizationUrl(state: string, redirectUri: string): string {
-  const clientId = process.env.QBO_CLIENT_ID;
+/** Required OAuth scope string from the provider (unchangeable). */
+const INTUIT_ACCOUNTING_OAUTH_SCOPE = "com.intuit.quickbooks.accounting";
+
+export function buildAccountingAuthorizationUrl(state: string, redirectUri: string): string {
+  const clientId = process.env.ACCOUNTING_OAUTH_CLIENT_ID;
   if (!clientId) {
-    throw new Error("QBO_CLIENT_ID must be set.");
+    throw new Error("ACCOUNTING_OAUTH_CLIENT_ID must be set.");
   }
   const params = new URLSearchParams({
     client_id: clientId,
-    scope: "com.intuit.quickbooks.accounting",
+    scope: INTUIT_ACCOUNTING_OAUTH_SCOPE,
     redirect_uri: redirectUri,
     response_type: "code",
     state,
@@ -43,7 +51,7 @@ export function buildQboAuthorizationUrl(state: string, redirectUri: string): st
   return `${INTUIT_AUTH_BASE}?${params.toString()}`;
 }
 
-export type QboTokenResponse = {
+export type AccountingOAuthTokenResponse = {
   access_token: string;
   refresh_token: string;
   expires_in: number;
@@ -51,14 +59,16 @@ export type QboTokenResponse = {
   token_type: string;
 };
 
-export async function exchangeQboAuthorizationCode(
+export async function exchangeAccountingOAuthCode(
   code: string,
   redirectUri: string
-): Promise<{ ok: true; tokens: QboTokenResponse } | { ok: false; error: string; status: number }> {
-  const clientId = process.env.QBO_CLIENT_ID;
-  const clientSecret = process.env.QBO_CLIENT_SECRET;
+): Promise<
+  { ok: true; tokens: AccountingOAuthTokenResponse } | { ok: false; error: string; status: number }
+> {
+  const clientId = process.env.ACCOUNTING_OAUTH_CLIENT_ID;
+  const clientSecret = process.env.ACCOUNTING_OAUTH_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    return { ok: false, error: "QBO client credentials are not configured.", status: 500 };
+    return { ok: false, error: "Accounting OAuth client credentials are not configured.", status: 500 };
   }
 
   const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
@@ -83,11 +93,14 @@ export async function exchangeQboAuthorizationCode(
   try {
     json = JSON.parse(text) as Record<string, unknown>;
   } catch {
-    console.error("[qbo:token] non-JSON response", { status: res.status, bodyHead: text.slice(0, 800) });
+    console.error("[accounting-oauth:token] non-JSON response", {
+      status: res.status,
+      bodyHead: text.slice(0, 800),
+    });
     const snippet = text.replace(/\s+/g, " ").trim().slice(0, 80);
     return {
       ok: false,
-      error: `Intuit token HTTP ${res.status} (not JSON). Check client id/secret; redirect URI must match Intuit app and Connect host. Logs show body prefix. Snippet: ${snippet || "(empty)"}`,
+      error: `Intuit token HTTP ${res.status} (not JSON). Check client id/secret; redirect URI must match the developer app and Connect host. Logs show body prefix. Snippet: ${snippet || "(empty)"}`,
       status: res.status || 502,
     };
   }
@@ -126,8 +139,11 @@ export async function exchangeQboAuthorizationCode(
   };
 }
 
-export async function fetchQboCompanyName(realmId: string, accessToken: string): Promise<string | null> {
-  const base = getQboApiBase();
+export async function fetchAccountingCompanyDisplayName(
+  realmId: string,
+  accessToken: string
+): Promise<string | null> {
+  const base = getAccountingProviderApiBase();
   const url = `${base}/v3/company/${realmId}/companyinfo/${realmId}?minorversion=65`;
   const res = await fetch(url, {
     headers: {

@@ -1,3 +1,8 @@
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 import { WorkflowPageFrame } from "@/components/finance/workflow-page-frame";
 import { WorkflowDataTable } from "@/components/finance/workflow-data-table";
 import {

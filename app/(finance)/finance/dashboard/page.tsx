@@ -1,3 +1,8 @@
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 import {
   TrendingUp, AlertCircle, CheckCircle2,
   ArrowRight, Clock, DollarSign, Users, FileText,
@@ -196,12 +201,12 @@ function buildSetupChecklist(
       href: "/finance/evidence",
     },
     {
-      label: "Pack 024 — QuickBooks Online OAuth (Pack 002 extension)",
+      label: "Pack 024 — External accounting OAuth (Pack 002 extension)",
       complete: PACK >= 24,
-      href: "/finance/integration/quickbooks",
+      href: "/finance/integration/accounting-oauth",
     },
     {
-      label: "Pack 025 — QBD-style chart of accounts + account source-of-truth",
+      label: "Pack 025 — Chart of accounts + integration taxonomy & source-of-truth",
       complete: PACK >= 25,
       href: "/finance/accounts",
     },
@@ -211,8 +216,13 @@ function buildSetupChecklist(
       href: "/finance/payroll/desktop",
     },
     {
-      label: "Pack 027 — QBD-aligned account categories (metadata + seed)",
+      label: "Pack 027 — Integration account categories (metadata + seed)",
       complete: PACK >= 27,
+      href: "/finance/accounts",
+    },
+    {
+      label: "Pack 028 — Neutral integration naming (DB columns + OAuth tables)",
+      complete: PACK >= 28,
       href: "/finance/accounts",
     },
     { label: "ESCT Holdings tenant created", complete: true, href: null },
@@ -252,10 +262,11 @@ const MODULE_SCHEMA_STATUS: { name: string; ready: boolean }[] = [
   { name: "Subledger GL & reporting automation", ready: PACK >= 17 },
   { name: "GL reversals & AP subledger", ready: PACK >= 18 },
   { name: "Evidence, approvals, TB cache & integration diagnostics", ready: PACK >= 23 },
-  { name: "QuickBooks Online OAuth (Pack 002)", ready: PACK >= 24 },
-  { name: "QBD account taxonomy & source of truth", ready: PACK >= 25 },
+  { name: "External accounting OAuth (Pack 002)", ready: PACK >= 24 },
+  { name: "Integration account taxonomy & source of truth", ready: PACK >= 25 },
   { name: "Desktop payroll items & liabilities", ready: PACK >= 26 },
-  { name: "QBD account category metadata", ready: PACK >= 27 },
+  { name: "Integration account category metadata", ready: PACK >= 27 },
+  { name: "Neutral integration schema naming", ready: PACK >= 28 },
 ];
 
 const QUICK_LINKS = [

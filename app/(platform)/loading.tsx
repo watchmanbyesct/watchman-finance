@@ -1,3 +1,8 @@
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 export default function PlatformLoading() {
   return (
     <div className="max-w-4xl space-y-6 animate-pulse" aria-busy="true" aria-label="Loading">

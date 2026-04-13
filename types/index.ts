@@ -84,8 +84,8 @@ export interface Account {
   name: string;
   description?: string | null;
   accountType: string;
-  qbdAccountType: string | null;
-  qbdDetailType: string | null;
+  integrationAccountType: string | null;
+  integrationDetailType: string | null;
   sourceOfTruth:
     | "gl_manual"
     | "bank_register"

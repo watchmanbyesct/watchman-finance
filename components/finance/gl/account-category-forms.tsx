@@ -1,11 +1,19 @@
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 "use client";
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import type { FinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import type { ActionResult } from "@/lib/errors/app-error";
-import { createAccountCategory, seedQbdAccountCategories } from "@/modules/finance-core/actions/finance-core-actions";
-import { QBD_ACCOUNT_TYPE_VALUES } from "@/lib/finance/account-pack025-metadata";
+import {
+  createAccountCategory,
+  seedIntegrationAccountCategories,
+} from "@/modules/finance-core/actions/finance-core-actions";
+import { INTEGRATION_ACCOUNT_TYPE_VALUES } from "@/lib/finance/account-integration-taxonomy";
 
 /** Prefer the real server/DB message when the wrapper only shows a generic internal_error. */
 function actionUserMessage(res: ActionResult<unknown>): string {
@@ -22,17 +30,17 @@ function fmt(s: string): string {
   return s.replaceAll("_", " ");
 }
 
-export function QbdAccountCategorySeedButton({ workspace }: { workspace: FinanceWorkspace }) {
+export function IntegrationAccountCategorySeedButton({ workspace }: { workspace: FinanceWorkspace }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
 
   return (
     <div className="wf-card border border-amber-500/20 bg-amber-950/10 space-y-2.5">
-      <p className="text-sm font-medium text-neutral-100">QBD account categories</p>
+      <p className="text-sm font-medium text-neutral-100">Integration account categories</p>
       <p className="text-xs text-neutral-500 leading-relaxed">
-        Upserts a QuickBooks Desktop–style category list (bank, AR, AP, income, expense buckets, plus legacy codes used
-        by the default COA seed). Safe to re-run.
+        Upserts a standard category list (bank, AR, AP, income, expense buckets, plus legacy codes used by the default
+        COA seed). Safe to re-run.
       </p>
       {msg ? <p className="text-xs text-amber-400">{msg}</p> : null}
       <button
@@ -40,14 +48,14 @@ export function QbdAccountCategorySeedButton({ workspace }: { workspace: Finance
         disabled={pending}
         onClick={() => {
           start(async () => {
-            const res = await seedQbdAccountCategories({ tenantId: workspace.tenantId });
+            const res = await seedIntegrationAccountCategories({ tenantId: workspace.tenantId });
             setMsg(actionUserMessage(res));
             if (res.success) router.refresh();
           });
         }}
         className="rounded-md border border-amber-500/30 bg-amber-500/90 px-4 py-2 text-sm font-medium text-black hover:bg-amber-400 disabled:opacity-60"
       >
-        {pending ? "Seeding…" : "Seed QBD categories"}
+        {pending ? "Seeding…" : "Seed integration categories"}
       </button>
     </div>
   );
@@ -63,8 +71,8 @@ export function CreateAccountCategoryForm({ workspace }: { workspace: FinanceWor
       <h2 className="text-sm font-medium text-neutral-200">Create custom category</h2>
       <p className="text-xs text-neutral-500 leading-relaxed">
         Add your own grouping for the chart of accounts. Code must be unique per tenant (lowercase, underscores). GL
-        type and normal balance define how accounts in this category behave; QBD type drives default new-account
-        classification.
+        type and normal balance define how accounts in this category behave; integration taxonomy drives default
+        new-account classification.
       </p>
       {msg && <p className="text-xs text-amber-400">{msg}</p>}
       <form
@@ -74,7 +82,7 @@ export function CreateAccountCategoryForm({ workspace }: { workspace: FinanceWor
           const fd = new FormData(e.currentTarget);
           start(async () => {
             setMsg(null);
-            const qbdRaw = String(fd.get("qbdAccountType") ?? "").trim();
+            const taxRaw = String(fd.get("integrationAccountType") ?? "").trim();
             const res = await createAccountCategory({
               tenantId: workspace.tenantId,
               code: String(fd.get("code") ?? "").trim(),
@@ -86,7 +94,9 @@ export function CreateAccountCategoryForm({ workspace }: { workspace: FinanceWor
                 | "revenue"
                 | "expense",
               normalBalance: String(fd.get("normalBalance") ?? "debit") as "debit" | "credit",
-              qbdAccountType: qbdRaw ? (qbdRaw as (typeof QBD_ACCOUNT_TYPE_VALUES)[number]) : undefined,
+              integrationAccountType: taxRaw
+                ? (taxRaw as (typeof INTEGRATION_ACCOUNT_TYPE_VALUES)[number])
+                : undefined,
             });
             setMsg(actionUserMessage(res));
             if (res.success) {
@@ -122,10 +132,10 @@ export function CreateAccountCategoryForm({ workspace }: { workspace: FinanceWor
           </select>
         </label>
         <label className="flex flex-col gap-1 md:col-span-2">
-          <span className="text-neutral-500 text-xs">QBD account type (optional default)</span>
-          <select name="qbdAccountType" className={input}>
+          <span className="text-neutral-500 text-xs">Integration account type (optional default)</span>
+          <select name="integrationAccountType" className={input}>
             <option value="">Auto from GL type</option>
-            {QBD_ACCOUNT_TYPE_VALUES.map((v) => (
+            {INTEGRATION_ACCOUNT_TYPE_VALUES.map((v) => (
               <option key={v} value={v}>
                 {fmt(v)}
               </option>

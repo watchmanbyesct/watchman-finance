@@ -8,7 +8,7 @@ import { createVendor } from "@/modules/ap/actions/ap-actions";
 import {
   seedChartOfAccounts,
   seedFiscalPeriods,
-  seedQbdAccountCategories,
+  seedIntegrationAccountCategories,
 } from "@/modules/finance-core/actions/finance-core-actions";
 import {
   createPayGroup,
@@ -63,8 +63,8 @@ export async function seedAllPlatformWorkflows(
       steps.push({ key, success, message });
     };
 
-    const qbdCats = await seedQbdAccountCategories({ tenantId: parsed.tenantId });
-    push("account_categories_qbd", qbdCats.success, qbdCats.message);
+    const integrationCats = await seedIntegrationAccountCategories({ tenantId: parsed.tenantId });
+    push("account_categories_integration", integrationCats.success, integrationCats.message);
 
     const coa = await seedChartOfAccounts({
       tenantId: parsed.tenantId,

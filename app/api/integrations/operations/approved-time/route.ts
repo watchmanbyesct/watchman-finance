@@ -1,3 +1,8 @@
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { verifyIntegrationRequest, integrationErrorResponse } from "@/lib/auth/verify-integration-request";
 import { createSupabaseAdminClient } from "@/lib/db/supabase-server";

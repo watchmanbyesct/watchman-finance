@@ -4,153 +4,153 @@
     "name": "Bank",
     "category_type": "asset",
     "normal_balance": "debit",
-    "qbd_account_type": "bank"
+    "integration_account_type": "bank"
   },
   {
     "code": "accounts_receivable",
     "name": "Accounts Receivable",
     "category_type": "asset",
     "normal_balance": "debit",
-    "qbd_account_type": "accounts_receivable"
+    "integration_account_type": "accounts_receivable"
   },
   {
     "code": "other_current_asset",
     "name": "Other Current Asset",
     "category_type": "asset",
     "normal_balance": "debit",
-    "qbd_account_type": "other_current_asset"
+    "integration_account_type": "other_current_asset"
   },
   {
     "code": "fixed_asset",
     "name": "Fixed Asset",
     "category_type": "asset",
     "normal_balance": "debit",
-    "qbd_account_type": "fixed_asset"
+    "integration_account_type": "fixed_asset"
   },
   {
     "code": "other_asset",
     "name": "Other Asset",
     "category_type": "asset",
     "normal_balance": "debit",
-    "qbd_account_type": "other_asset"
+    "integration_account_type": "other_asset"
   },
   {
     "code": "accounts_payable",
     "name": "Accounts Payable",
     "category_type": "liability",
     "normal_balance": "credit",
-    "qbd_account_type": "accounts_payable"
+    "integration_account_type": "accounts_payable"
   },
   {
     "code": "credit_card",
     "name": "Credit Card",
     "category_type": "liability",
     "normal_balance": "credit",
-    "qbd_account_type": "credit_card"
+    "integration_account_type": "credit_card"
   },
   {
     "code": "other_current_liability",
     "name": "Other Current Liability",
     "category_type": "liability",
     "normal_balance": "credit",
-    "qbd_account_type": "other_current_liability"
+    "integration_account_type": "other_current_liability"
   },
   {
     "code": "long_term_liability",
     "name": "Long-Term Liability",
     "category_type": "liability",
     "normal_balance": "credit",
-    "qbd_account_type": "long_term_liability"
+    "integration_account_type": "long_term_liability"
   },
   {
     "code": "equity",
     "name": "Equity",
     "category_type": "equity",
     "normal_balance": "credit",
-    "qbd_account_type": "equity"
+    "integration_account_type": "equity"
   },
   {
     "code": "income",
     "name": "Income",
     "category_type": "revenue",
     "normal_balance": "credit",
-    "qbd_account_type": "income"
+    "integration_account_type": "income"
   },
   {
     "code": "other_income",
     "name": "Other Income",
     "category_type": "revenue",
     "normal_balance": "credit",
-    "qbd_account_type": "other_income"
+    "integration_account_type": "other_income"
   },
   {
     "code": "cogs",
     "name": "Cost of Goods Sold",
     "category_type": "expense",
     "normal_balance": "debit",
-    "qbd_account_type": "cogs"
+    "integration_account_type": "cogs"
   },
   {
     "code": "expense",
     "name": "Expenses",
     "category_type": "expense",
     "normal_balance": "debit",
-    "qbd_account_type": "expense"
+    "integration_account_type": "expense"
   },
   {
     "code": "other_expense",
     "name": "Other Expenses",
     "category_type": "expense",
     "normal_balance": "debit",
-    "qbd_account_type": "other_expense"
+    "integration_account_type": "other_expense"
   },
   {
     "code": "assets_current",
     "name": "Current Assets (legacy bucket)",
     "category_type": "asset",
     "normal_balance": "debit",
-    "qbd_account_type": "other_current_asset"
+    "integration_account_type": "other_current_asset"
   },
   {
     "code": "assets_fixed",
     "name": "Fixed Assets (legacy bucket)",
     "category_type": "asset",
     "normal_balance": "debit",
-    "qbd_account_type": "fixed_asset"
+    "integration_account_type": "fixed_asset"
   },
   {
     "code": "liabilities_current",
     "name": "Current Liabilities (legacy bucket)",
     "category_type": "liability",
     "normal_balance": "credit",
-    "qbd_account_type": "other_current_liability"
+    "integration_account_type": "other_current_liability"
   },
   {
     "code": "liabilities_lt",
     "name": "Long-Term Liabilities (legacy bucket)",
     "category_type": "liability",
     "normal_balance": "credit",
-    "qbd_account_type": "long_term_liability"
+    "integration_account_type": "long_term_liability"
   },
   {
     "code": "revenue",
     "name": "Revenue (legacy bucket)",
     "category_type": "revenue",
     "normal_balance": "credit",
-    "qbd_account_type": "income"
+    "integration_account_type": "income"
   },
   {
     "code": "operating_expense",
     "name": "Operating Expenses (legacy bucket)",
     "category_type": "expense",
     "normal_balance": "debit",
-    "qbd_account_type": "expense"
+    "integration_account_type": "expense"
   },
   {
     "code": "payroll_expense",
     "name": "Payroll Expenses (legacy bucket)",
     "category_type": "expense",
     "normal_balance": "debit",
-    "qbd_account_type": "expense"
+    "integration_account_type": "expense"
   }
 ]

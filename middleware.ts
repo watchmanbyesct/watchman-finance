@@ -1,3 +1,8 @@
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
@@ -5,7 +10,7 @@ const PUBLIC_PATHS = [
   "/login",
   "/auth/callback",
   "/api/health",
-  "/api/integrations/quickbooks/webhook",
+  "/api/integrations/accounting-oauth/webhook",
 ];
 
 /** Public files under /public (logos, icons) must not require session — image requests are separate from the page. */

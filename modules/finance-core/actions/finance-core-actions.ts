@@ -8,9 +8,9 @@ import { writeAuditLog } from "@/lib/audit/write-audit-log";
 import { mapErrorToResult, type ActionResult } from "@/lib/errors/app-error";
 import { ACCOUNT_CATEGORY_SEED_ROWS } from "@/lib/finance/account-category-seed";
 import {
-  QBD_ACCOUNT_TYPE_VALUES,
+  INTEGRATION_ACCOUNT_TYPE_VALUES,
   SOURCE_OF_TRUTH_VALUES,
-} from "@/lib/finance/account-pack025-metadata";
+} from "@/lib/finance/account-integration-taxonomy";
 import { z } from "zod";
 
 // ── Schemas ───────────────────────────────────────────────────────────────────
@@ -30,7 +30,7 @@ const CreateAccountSchema = z.object({
   accountCategoryId: z.string().uuid(),
   code:              z.string().min(1).max(50),
   name:              z.string().min(1).max(255),
-  /** Deprecated: GL type and normal balance are taken from the category (QBD model). */
+  /** Deprecated: GL type and normal balance are taken from the category (integration taxonomy). */
   accountType: z.preprocess(
     (v) => (v === "" || v === null || v === undefined ? undefined : v),
     z.string().min(1).optional()
@@ -80,9 +80,9 @@ const SeedFiscalPeriodsSchema = z.object({
 });
 
 const SourceOfTruthZ = z.enum(SOURCE_OF_TRUTH_VALUES as unknown as [string, ...string[]]);
-const QbdAccountTypeZ = z.enum(QBD_ACCOUNT_TYPE_VALUES as unknown as [string, ...string[]]);
+const IntegrationAccountTypeZ = z.enum(INTEGRATION_ACCOUNT_TYPE_VALUES as unknown as [string, ...string[]]);
 
-const SeedQbdAccountCategoriesSchema = z.object({
+const SeedIntegrationAccountCategoriesSchema = z.object({
   tenantId: z.string().uuid(),
 });
 
@@ -99,13 +99,13 @@ const CreateAccountCategorySchema = z.object({
   name: z.string().min(1).max(255).transform((s) => s.trim()),
   categoryType: z.enum(["asset", "liability", "equity", "revenue", "expense"]),
   normalBalance: z.enum(["debit", "credit"]),
-  qbdAccountType: z.preprocess(
+  integrationAccountType: z.preprocess(
     (v) => (v === "" || v === null || v === undefined ? undefined : v),
-    QbdAccountTypeZ.optional()
+    IntegrationAccountTypeZ.optional()
   ),
 });
 
-function defaultQbdForGlCategoryType(glType: string): string {
+function defaultIntegrationTypeForGlCategory(glType: string): string {
   switch (glType) {
     case "asset":
       return "other_current_asset";
@@ -129,9 +129,9 @@ const UpdateAccountSchema = z.object({
   allowPosting:    z.boolean().optional(),
   isActive:        z.boolean().optional(),
   parentAccountId: z.string().uuid().optional().nullable(),
-  /** null clears QBD type in DB */
-  qbdAccountType: z.union([QbdAccountTypeZ, z.null()]).optional(),
-  qbdDetailType: z.preprocess(
+  /** null clears integration taxonomy type in DB */
+  integrationAccountType: z.union([IntegrationAccountTypeZ, z.null()]).optional(),
+  integrationDetailType: z.preprocess(
     (v) => (v === "" ? null : v),
     z.union([z.string().max(200), z.null()]).optional()
   ),
@@ -234,7 +234,7 @@ export async function createAccount(
 
     const { data: catRow, error: catErr } = await admin
       .from("account_categories")
-      .select("id, category_type, normal_balance, qbd_account_type")
+      .select("id, category_type, normal_balance, integration_account_type")
       .eq("id", input.accountCategoryId)
       .eq("tenant_id", input.tenantId)
       .maybeSingle();
@@ -243,16 +243,16 @@ export async function createAccount(
     if (!catRow) {
       return {
         success: false,
-        message: "Account category not found for this tenant. Seed QBD categories or create a custom category.",
+        message: "Account category not found for this tenant. Seed integration categories or create a custom category.",
       };
     }
 
     const accountType = String(catRow.category_type);
     const normalBalance = String(catRow.normal_balance) as "debit" | "credit";
-    const qbdAccountType =
-      catRow.qbd_account_type != null && String(catRow.qbd_account_type).length > 0
-        ? String(catRow.qbd_account_type)
-        : defaultQbdForGlCategoryType(accountType);
+    const integrationAccountType =
+      catRow.integration_account_type != null && String(catRow.integration_account_type).length > 0
+        ? String(catRow.integration_account_type)
+        : defaultIntegrationTypeForGlCategory(accountType);
 
     // Unique code per entity
     const { data: existing } = await admin
@@ -279,7 +279,7 @@ export async function createAccount(
         code:                input.code,
         name:                input.name,
         account_type:        accountType,
-        qbd_account_type:    qbdAccountType,
+        integration_account_type:    integrationAccountType,
         source_of_truth:     "gl_manual",
         normal_balance:      normalBalance,
         allow_posting:       input.allowPosting,
@@ -320,8 +320,8 @@ type SeedAccountTemplate = {
   name: string;
   categoryCode: string;
   accountType: string;
-  qbdAccountType: string;
-  qbdDetailType: string;
+  integrationAccountType: string;
+  integrationDetailType: string;
   sourceOfTruth:
     | "gl_manual"
     | "bank_register"
@@ -334,22 +334,22 @@ type SeedAccountTemplate = {
 };
 
 const DEFAULT_COA_TEMPLATES: SeedAccountTemplate[] = [
-  { code: "1000", name: "Cash", categoryCode: "assets_current", accountType: "asset", qbdAccountType: "bank", qbdDetailType: "checking", sourceOfTruth: "bank_register", normalBalance: "debit", allowPosting: true },
-  { code: "1100", name: "Accounts Receivable", categoryCode: "assets_current", accountType: "asset", qbdAccountType: "accounts_receivable", qbdDetailType: "ar", sourceOfTruth: "ar_subledger", normalBalance: "debit", allowPosting: true },
-  { code: "1200", name: "Undeposited Funds", categoryCode: "assets_current", accountType: "asset", qbdAccountType: "other_current_asset", qbdDetailType: "undeposited_funds", sourceOfTruth: "ar_subledger", normalBalance: "debit", allowPosting: true },
-  { code: "1300", name: "Prepaid Expenses", categoryCode: "assets_current", accountType: "asset", qbdAccountType: "other_current_asset", qbdDetailType: "prepaid_expenses", sourceOfTruth: "gl_manual", normalBalance: "debit", allowPosting: true },
-  { code: "1500", name: "Equipment", categoryCode: "assets_fixed", accountType: "asset", qbdAccountType: "fixed_asset", qbdDetailType: "machinery_and_equipment", sourceOfTruth: "gl_manual", normalBalance: "debit", allowPosting: true },
-  { code: "2000", name: "Accounts Payable", categoryCode: "liabilities_current", accountType: "liability", qbdAccountType: "accounts_payable", qbdDetailType: "ap", sourceOfTruth: "ap_subledger", normalBalance: "credit", allowPosting: true },
-  { code: "2100", name: "Accrued Expenses", categoryCode: "liabilities_current", accountType: "liability", qbdAccountType: "other_current_liability", qbdDetailType: "accrued_liabilities", sourceOfTruth: "gl_manual", normalBalance: "credit", allowPosting: true },
-  { code: "2200", name: "Payroll Liabilities", categoryCode: "liabilities_current", accountType: "liability", qbdAccountType: "other_current_liability", qbdDetailType: "payroll_liabilities", sourceOfTruth: "payroll_subledger", normalBalance: "credit", allowPosting: true },
-  { code: "2500", name: "Long-Term Debt", categoryCode: "liabilities_lt", accountType: "liability", qbdAccountType: "long_term_liability", qbdDetailType: "notes_payable", sourceOfTruth: "gl_manual", normalBalance: "credit", allowPosting: true },
-  { code: "3000", name: "Owner's Equity", categoryCode: "equity", accountType: "equity", qbdAccountType: "equity", qbdDetailType: "owners_equity", sourceOfTruth: "system", normalBalance: "credit", allowPosting: true },
-  { code: "4000", name: "Service Revenue", categoryCode: "revenue", accountType: "revenue", qbdAccountType: "income", qbdDetailType: "service_fee_income", sourceOfTruth: "ar_subledger", normalBalance: "credit", allowPosting: true },
-  { code: "5000", name: "Cost of Services", categoryCode: "cogs", accountType: "expense", qbdAccountType: "cogs", qbdDetailType: "supplies_materials_cogs", sourceOfTruth: "ap_subledger", normalBalance: "debit", allowPosting: true },
-  { code: "6000", name: "Operating Expense", categoryCode: "operating_expense", accountType: "expense", qbdAccountType: "expense", qbdDetailType: "office_general_administrative", sourceOfTruth: "ap_subledger", normalBalance: "debit", allowPosting: true },
-  { code: "6100", name: "Payroll Expense", categoryCode: "payroll_expense", accountType: "expense", qbdAccountType: "expense", qbdDetailType: "payroll_expenses", sourceOfTruth: "payroll_subledger", normalBalance: "debit", allowPosting: true },
-  { code: "7000", name: "Other Income", categoryCode: "other_income", accountType: "revenue", qbdAccountType: "other_income", qbdDetailType: "other_miscellaneous_income", sourceOfTruth: "gl_manual", normalBalance: "credit", allowPosting: true },
-  { code: "8000", name: "Other Expense", categoryCode: "other_expense", accountType: "expense", qbdAccountType: "other_expense", qbdDetailType: "other_miscellaneous_expense", sourceOfTruth: "gl_manual", normalBalance: "debit", allowPosting: true },
+  { code: "1000", name: "Cash", categoryCode: "assets_current", accountType: "asset", integrationAccountType: "bank", integrationDetailType: "checking", sourceOfTruth: "bank_register", normalBalance: "debit", allowPosting: true },
+  { code: "1100", name: "Accounts Receivable", categoryCode: "assets_current", accountType: "asset", integrationAccountType: "accounts_receivable", integrationDetailType: "ar", sourceOfTruth: "ar_subledger", normalBalance: "debit", allowPosting: true },
+  { code: "1200", name: "Undeposited Funds", categoryCode: "assets_current", accountType: "asset", integrationAccountType: "other_current_asset", integrationDetailType: "undeposited_funds", sourceOfTruth: "ar_subledger", normalBalance: "debit", allowPosting: true },
+  { code: "1300", name: "Prepaid Expenses", categoryCode: "assets_current", accountType: "asset", integrationAccountType: "other_current_asset", integrationDetailType: "prepaid_expenses", sourceOfTruth: "gl_manual", normalBalance: "debit", allowPosting: true },
+  { code: "1500", name: "Equipment", categoryCode: "assets_fixed", accountType: "asset", integrationAccountType: "fixed_asset", integrationDetailType: "machinery_and_equipment", sourceOfTruth: "gl_manual", normalBalance: "debit", allowPosting: true },
+  { code: "2000", name: "Accounts Payable", categoryCode: "liabilities_current", accountType: "liability", integrationAccountType: "accounts_payable", integrationDetailType: "ap", sourceOfTruth: "ap_subledger", normalBalance: "credit", allowPosting: true },
+  { code: "2100", name: "Accrued Expenses", categoryCode: "liabilities_current", accountType: "liability", integrationAccountType: "other_current_liability", integrationDetailType: "accrued_liabilities", sourceOfTruth: "gl_manual", normalBalance: "credit", allowPosting: true },
+  { code: "2200", name: "Payroll Liabilities", categoryCode: "liabilities_current", accountType: "liability", integrationAccountType: "other_current_liability", integrationDetailType: "payroll_liabilities", sourceOfTruth: "payroll_subledger", normalBalance: "credit", allowPosting: true },
+  { code: "2500", name: "Long-Term Debt", categoryCode: "liabilities_lt", accountType: "liability", integrationAccountType: "long_term_liability", integrationDetailType: "notes_payable", sourceOfTruth: "gl_manual", normalBalance: "credit", allowPosting: true },
+  { code: "3000", name: "Owner's Equity", categoryCode: "equity", accountType: "equity", integrationAccountType: "equity", integrationDetailType: "owners_equity", sourceOfTruth: "system", normalBalance: "credit", allowPosting: true },
+  { code: "4000", name: "Service Revenue", categoryCode: "revenue", accountType: "revenue", integrationAccountType: "income", integrationDetailType: "service_fee_income", sourceOfTruth: "ar_subledger", normalBalance: "credit", allowPosting: true },
+  { code: "5000", name: "Cost of Services", categoryCode: "cogs", accountType: "expense", integrationAccountType: "cogs", integrationDetailType: "supplies_materials_cogs", sourceOfTruth: "ap_subledger", normalBalance: "debit", allowPosting: true },
+  { code: "6000", name: "Operating Expense", categoryCode: "operating_expense", accountType: "expense", integrationAccountType: "expense", integrationDetailType: "office_general_administrative", sourceOfTruth: "ap_subledger", normalBalance: "debit", allowPosting: true },
+  { code: "6100", name: "Payroll Expense", categoryCode: "payroll_expense", accountType: "expense", integrationAccountType: "expense", integrationDetailType: "payroll_expenses", sourceOfTruth: "payroll_subledger", normalBalance: "debit", allowPosting: true },
+  { code: "7000", name: "Other Income", categoryCode: "other_income", accountType: "revenue", integrationAccountType: "other_income", integrationDetailType: "other_miscellaneous_income", sourceOfTruth: "gl_manual", normalBalance: "credit", allowPosting: true },
+  { code: "8000", name: "Other Expense", categoryCode: "other_expense", accountType: "expense", integrationAccountType: "other_expense", integrationDetailType: "other_miscellaneous_expense", sourceOfTruth: "gl_manual", normalBalance: "debit", allowPosting: true },
 ];
 
 /**
@@ -395,8 +395,8 @@ export async function seedChartOfAccounts(
       code: a.code,
       name: a.name,
       account_type: a.accountType,
-      qbd_account_type: a.qbdAccountType,
-      qbd_detail_type: a.qbdDetailType,
+      integration_account_type: a.integrationAccountType,
+      integration_detail_type: a.integrationDetailType,
       source_of_truth: a.sourceOfTruth,
       normal_balance: a.normalBalance,
       allow_posting: a.allowPosting,
@@ -432,14 +432,14 @@ export async function seedChartOfAccounts(
 }
 
 /**
- * Upsert QuickBooks Desktop–style account categories for the tenant.
+ * Upsert standard integration account categories for the tenant.
  * Permission: gl.account.manage
  */
-export async function seedQbdAccountCategories(
-  input: z.infer<typeof SeedQbdAccountCategoriesSchema>
+export async function seedIntegrationAccountCategories(
+  input: z.infer<typeof SeedIntegrationAccountCategoriesSchema>
 ): Promise<ActionResult<{ seededCount: number }>> {
   try {
-    const v = SeedQbdAccountCategoriesSchema.parse(input);
+    const v = SeedIntegrationAccountCategoriesSchema.parse(input);
     const ctx = await resolveRequestContext(v.tenantId);
     requirePermission(ctx, "gl.account.manage");
 
@@ -451,14 +451,14 @@ export async function seedQbdAccountCategories(
       name: r.name,
       category_type: r.category_type,
       normal_balance: r.normal_balance,
-      qbd_account_type: r.qbd_account_type,
+      integration_account_type: r.integration_account_type,
       status: "active",
       updated_at: now,
     }));
 
     const { error } = await admin.from("account_categories").upsert(rows, { onConflict: "tenant_id,code" });
     if (error) {
-      console.error("[seedQbdAccountCategories]", error.message, error);
+      console.error("[seedIntegrationAccountCategories]", error.message, error);
       return {
         success: false,
         message: error.message,
@@ -471,7 +471,7 @@ export async function seedQbdAccountCategories(
       entityId: null,
       actorPlatformUserId: ctx.platformUserId,
       moduleKey: "finance_core",
-      actionCode: "gl.account_category.seed_qbd",
+      actionCode: "gl.account_category.seed_integration_taxonomy",
       targetTable: "account_categories",
       newValues: { seededCount: rows.length },
     });
@@ -479,7 +479,7 @@ export async function seedQbdAccountCategories(
     revalidatePath("/finance/accounts");
     return {
       success: true,
-      message: `Seeded ${rows.length} QBD-style account categories (upserted).`,
+      message: `Seeded ${rows.length} integration account categories (upserted).`,
       data: { seededCount: rows.length },
     };
   } catch (err) {
@@ -500,8 +500,8 @@ export async function createAccountCategory(
     requirePermission(ctx, "gl.account.manage");
 
     const admin = createSupabaseAdminClient();
-    const qbd =
-      parsed.qbdAccountType ?? defaultQbdForGlCategoryType(parsed.categoryType);
+    const integrationTypeDefault =
+      parsed.integrationAccountType ?? defaultIntegrationTypeForGlCategory(parsed.categoryType);
 
     const { data: row, error } = await admin
       .from("account_categories")
@@ -511,7 +511,7 @@ export async function createAccountCategory(
         name: parsed.name,
         category_type: parsed.categoryType,
         normal_balance: parsed.normalBalance,
-        qbd_account_type: qbd,
+        integration_account_type: integrationTypeDefault,
         status: "active",
       })
       .select("id")
@@ -536,7 +536,7 @@ export async function createAccountCategory(
       actionCode: "gl.account_category.create",
       targetTable: "account_categories",
       targetRecordId: row.id,
-      newValues: { code: parsed.code, categoryType: parsed.categoryType, qbdAccountType: qbd },
+      newValues: { code: parsed.code, categoryType: parsed.categoryType, integrationAccountType: integrationTypeDefault },
     });
 
     revalidatePath("/finance/accounts");
@@ -807,8 +807,8 @@ export async function updateAccount(
       parsed.allowPosting === undefined &&
       parsed.isActive === undefined &&
       parsed.parentAccountId === undefined &&
-      parsed.qbdAccountType === undefined &&
-      parsed.qbdDetailType === undefined &&
+      parsed.integrationAccountType === undefined &&
+      parsed.integrationDetailType === undefined &&
       parsed.sourceOfTruth === undefined &&
       parsed.sourceReferenceTable === undefined &&
       parsed.externalAccountRef === undefined
@@ -821,7 +821,7 @@ export async function updateAccount(
     const { data: row } = await admin
       .from("accounts")
       .select(
-        "id, name, description, allow_posting, is_active, parent_account_id, qbd_account_type, qbd_detail_type, source_of_truth, source_reference_table, external_account_ref"
+        "id, name, description, allow_posting, is_active, parent_account_id, integration_account_type, integration_detail_type, source_of_truth, source_reference_table, external_account_ref"
       )
       .eq("id", parsed.accountId)
       .eq("tenant_id", parsed.tenantId)
@@ -852,10 +852,10 @@ export async function updateAccount(
     if (parsed.allowPosting !== undefined) patch.allow_posting = parsed.allowPosting;
     if (parsed.isActive !== undefined) patch.is_active = parsed.isActive;
     if (parsed.parentAccountId !== undefined) patch.parent_account_id = parsed.parentAccountId;
-    if (parsed.qbdAccountType !== undefined) patch.qbd_account_type = parsed.qbdAccountType;
-    if (parsed.qbdDetailType !== undefined) {
-      patch.qbd_detail_type =
-        parsed.qbdDetailType === null || parsed.qbdDetailType === "" ? null : parsed.qbdDetailType;
+    if (parsed.integrationAccountType !== undefined) patch.integration_account_type = parsed.integrationAccountType;
+    if (parsed.integrationDetailType !== undefined) {
+      patch.integration_detail_type =
+        parsed.integrationDetailType === null || parsed.integrationDetailType === "" ? null : parsed.integrationDetailType;
     }
     if (parsed.sourceOfTruth !== undefined) patch.source_of_truth = parsed.sourceOfTruth;
     if (parsed.sourceReferenceTable !== undefined) {

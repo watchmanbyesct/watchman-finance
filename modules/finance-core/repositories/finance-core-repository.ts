@@ -13,7 +13,7 @@ export async function getAccountsByEntity(
     .from("accounts")
     .select(`
       id, tenant_id, entity_id, account_category_id,
-      code, name, description, account_type, qbd_account_type, qbd_detail_type, source_of_truth,
+      code, name, description, account_type, integration_account_type, integration_detail_type, source_of_truth,
       source_reference_table, external_account_ref, normal_balance,
       allow_posting, is_active, parent_account_id
     `)
@@ -73,7 +73,7 @@ export async function getAccountCategories(tenantId: string) {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase
     .from("account_categories")
-    .select("id, code, name, category_type, normal_balance, qbd_account_type, status")
+    .select("id, code, name, category_type, normal_balance, integration_account_type, status")
     .eq("tenant_id", tenantId)
     .eq("status", "active")
     .order("category_type")
@@ -95,8 +95,8 @@ function rowToAccount(row: any): Account {
     name:              row.name,
     description:       row.description ?? null,
     accountType:       row.account_type,
-    qbdAccountType:    row.qbd_account_type ?? null,
-    qbdDetailType:     row.qbd_detail_type ?? null,
+    integrationAccountType:    row.integration_account_type ?? null,
+    integrationDetailType:     row.integration_detail_type ?? null,
     sourceOfTruth:     row.source_of_truth,
     sourceReferenceTable: row.source_reference_table ?? null,
     externalAccountRef: row.external_account_ref ?? null,

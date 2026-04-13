@@ -1,4 +1,4 @@
-/** Pack 025 — must match DB check constraints on public.accounts */
+/** Pack 025 — must match DB check constraints on public.accounts.integration_account_type */
 
 export const SOURCE_OF_TRUTH_VALUES = [
   "gl_manual",
@@ -13,7 +13,7 @@ export const SOURCE_OF_TRUTH_VALUES = [
 
 export type SourceOfTruth = (typeof SOURCE_OF_TRUTH_VALUES)[number];
 
-export const QBD_ACCOUNT_TYPE_VALUES = [
+export const INTEGRATION_ACCOUNT_TYPE_VALUES = [
   "bank",
   "accounts_receivable",
   "other_current_asset",
@@ -31,4 +31,4 @@ export const QBD_ACCOUNT_TYPE_VALUES = [
   "other_expense",
 ] as const;
 
-export type QbdAccountType = (typeof QBD_ACCOUNT_TYPE_VALUES)[number];
+export type IntegrationAccountType = (typeof INTEGRATION_ACCOUNT_TYPE_VALUES)[number];

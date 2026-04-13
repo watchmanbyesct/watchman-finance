@@ -1,3 +1,8 @@
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 import Link from "next/link";
 import { WorkflowPageFrame } from "@/components/finance/workflow-page-frame";
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
@@ -5,7 +10,7 @@ import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace
 export const metadata = { title: "Pack 002 — Integration — Watchman Finance" };
 
 const LINKS = [
-  { href: "/finance/integration/quickbooks", label: "QuickBooks Online (OAuth)" },
+  { href: "/finance/integration/accounting-oauth", label: "External accounting (OAuth)" },
   { href: "/finance/integration/staging/employees", label: "Staging — Employees (Launch)" },
   { href: "/finance/integration/staging/time", label: "Staging — Approved time (Operations)" },
   { href: "/finance/integration/staging/service-events", label: "Staging — Service events" },

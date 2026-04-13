@@ -1,3 +1,8 @@
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 export default function FinanceLoading() {
   return (
     <div className="max-w-6xl space-y-8 animate-pulse" aria-busy="true" aria-label="Loading">

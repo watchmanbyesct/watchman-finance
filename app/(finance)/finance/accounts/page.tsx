@@ -1,3 +1,8 @@
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 import { ModuleWorkspaceStatus } from "@/components/finance/module-workspace-status";
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import { getAccountsByEntity, getAccountCategories } from "@/modules/finance-core/repositories/finance-core-repository";
@@ -6,7 +11,7 @@ import { GlSetupRequired } from "@/components/finance/gl/gl-setup-required";
 import { AccountCreateForm } from "@/components/finance/gl/account-create-form";
 import {
   CreateAccountCategoryForm,
-  QbdAccountCategorySeedButton,
+  IntegrationAccountCategorySeedButton,
 } from "@/components/finance/gl/account-category-forms";
 import { AccountsTable } from "@/components/finance/gl/accounts-table";
 import { AccountSeedButton } from "@/components/finance/gl/account-seed-button";
@@ -60,7 +65,7 @@ export default async function Page() {
       ) : (
         <>
           <AccountSeedButton tenantId={workspace.tenantId} entityId={workspace.entityId} />
-          <QbdAccountCategorySeedButton workspace={workspace} />
+          <IntegrationAccountCategorySeedButton workspace={workspace} />
           <CreateAccountCategoryForm workspace={workspace} />
           <AccountCreateForm workspace={workspace} categories={categories} />
 

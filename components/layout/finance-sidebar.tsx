@@ -39,7 +39,7 @@ const NAV: NavGroup[] = [
     title: "Integration (Pack 002)",
     items: [
       { label: "Pack 002 overview", href: "/finance/integration", icon: Plug },
-      { label: "QuickBooks Online", href: "/finance/integration/quickbooks", icon: Calculator },
+      { label: "External accounting (OAuth)", href: "/finance/integration/accounting-oauth", icon: Calculator },
       { label: "Staging — Employees", href: "/finance/integration/staging/employees", icon: Users },
       { label: "Staging — Time", href: "/finance/integration/staging/time", icon: CalendarClock },
       { label: "Staging — Service events", href: "/finance/integration/staging/service-events", icon: Zap },

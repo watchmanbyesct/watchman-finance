@@ -1,3 +1,8 @@
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 "use client";
 
 import { Fragment, useState, useTransition } from "react";
@@ -7,9 +12,9 @@ import type { FinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import { AccountArchiveButton } from "@/components/finance/gl/account-archive-button";
 import { updateAccount } from "@/modules/finance-core/actions/finance-core-actions";
 import {
-  QBD_ACCOUNT_TYPE_VALUES,
+  INTEGRATION_ACCOUNT_TYPE_VALUES,
   SOURCE_OF_TRUTH_VALUES,
-} from "@/lib/finance/account-pack025-metadata";
+} from "@/lib/finance/account-integration-taxonomy";
 
 function fmt(s: string): string {
   return s.replaceAll("_", " ");
@@ -45,7 +50,7 @@ export function AccountsTable({
             <th className="px-4 py-3 font-medium">Code</th>
             <th className="px-4 py-3 font-medium">Name</th>
             <th className="px-4 py-3 font-medium">Type</th>
-            <th className="px-4 py-3 font-medium">QBD / Source</th>
+            <th className="px-4 py-3 font-medium">Integration / Source</th>
             <th className="px-4 py-3 font-medium">Balance</th>
             <th className="px-4 py-3 font-medium">Posting</th>
             <th className="px-4 py-3 font-medium">Status</th>
@@ -71,7 +76,7 @@ export function AccountsTable({
                 <td className="px-4 py-2.5">{a.name}</td>
                 <td className="px-4 py-2.5 text-neutral-500">{a.accountType}</td>
                 <td className="px-4 py-2.5 text-xs text-neutral-500">
-                  {(a.qbdAccountType ? fmt(a.qbdAccountType) : "—")} / {fmt(a.sourceOfTruth)}
+                  {(a.integrationAccountType ? fmt(a.integrationAccountType) : "—")} / {fmt(a.sourceOfTruth)}
                 </td>
                 <td className="px-4 py-2.5 text-neutral-500 capitalize">{a.normalBalance}</td>
                 <td className="px-4 py-2.5">{a.allowPosting ? "Yes" : "No"}</td>
@@ -98,7 +103,7 @@ export function AccountsTable({
               {openId === a.id && (
                 <tr className="bg-white/[0.02]">
                   <td colSpan={9} className="px-4 py-4 border-t border-white/8">
-                    <AccountPack025Editor
+                    <AccountIntegrationMetadataEditor
                       account={a}
                       workspace={workspace}
                       onSaved={() => {
@@ -117,7 +122,7 @@ export function AccountsTable({
   );
 }
 
-function AccountPack025Editor({
+function AccountIntegrationMetadataEditor({
   account,
   workspace,
   onSaved,
@@ -127,8 +132,8 @@ function AccountPack025Editor({
   onSaved: () => void;
 }) {
   const [sourceOfTruth, setSourceOfTruth] = useState(account.sourceOfTruth);
-  const [qbdType, setQbdType] = useState(account.qbdAccountType ?? "");
-  const [detailType, setDetailType] = useState(account.qbdDetailType ?? "");
+  const [integrationType, setIntegrationType] = useState(account.integrationAccountType ?? "");
+  const [detailType, setDetailType] = useState(account.integrationDetailType ?? "");
   const [refTable, setRefTable] = useState(account.sourceReferenceTable ?? "");
   const [extRef, setExtRef] = useState(account.externalAccountRef ?? "");
   const [msg, setMsg] = useState<string | null>(null);
@@ -138,7 +143,7 @@ function AccountPack025Editor({
     <div className="space-y-3 max-w-3xl">
       <div>
         <h3 className="text-xs font-medium text-neutral-300">
-          Pack 025 — QBD classification & source of truth
+          Pack 025 — Integration taxonomy & source of truth
         </h3>
         <p className="text-xs text-neutral-500 mt-1 leading-relaxed">
           Source of truth marks which subsystem should originate activity for this account. Subledger GL bindings and
@@ -157,8 +162,8 @@ function AccountPack025Editor({
               entityId: workspace.entityId,
               accountId: account.id,
               sourceOfTruth,
-              qbdAccountType: qbdType === "" ? null : qbdType,
-              qbdDetailType: detailType.trim() === "" ? null : detailType.trim(),
+              integrationAccountType: integrationType === "" ? null : integrationType,
+              integrationDetailType: detailType.trim() === "" ? null : detailType.trim(),
               sourceReferenceTable: refTable.trim() === "" ? null : refTable.trim(),
               externalAccountRef: extRef.trim() === "" ? null : extRef.trim(),
             });
@@ -186,15 +191,15 @@ function AccountPack025Editor({
           </select>
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-neutral-500 text-xs">QBD account type</span>
+          <span className="text-neutral-500 text-xs">Integration account type</span>
           <select
-            name="qbdAccountType"
-            value={qbdType}
-            onChange={(e) => setQbdType(e.target.value)}
+            name="integrationAccountType"
+            value={integrationType}
+            onChange={(e) => setIntegrationType(e.target.value)}
             className={input}
           >
             <option value="">Not set</option>
-            {QBD_ACCOUNT_TYPE_VALUES.map((v) => (
+            {INTEGRATION_ACCOUNT_TYPE_VALUES.map((v) => (
               <option key={v} value={v}>
                 {fmt(v)}
               </option>
@@ -202,9 +207,9 @@ function AccountPack025Editor({
           </select>
         </label>
         <label className="flex flex-col gap-1 sm:col-span-2">
-          <span className="text-neutral-500 text-xs">QBD detail type (free text)</span>
+          <span className="text-neutral-500 text-xs">Integration detail type (free text)</span>
           <input
-            name="qbdDetailType"
+            name="integrationDetailType"
             value={detailType}
             onChange={(e) => setDetailType(e.target.value)}
             maxLength={200}
@@ -230,7 +235,7 @@ function AccountPack025Editor({
             value={extRef}
             onChange={(e) => setExtRef(e.target.value)}
             maxLength={200}
-            placeholder="e.g. QBO account id"
+            placeholder="e.g. external system account id"
             className={input}
           />
         </label>
@@ -246,8 +251,8 @@ function AccountPack025Editor({
             type="button"
             onClick={() => {
               setSourceOfTruth(account.sourceOfTruth);
-              setQbdType(account.qbdAccountType ?? "");
-              setDetailType(account.qbdDetailType ?? "");
+              setIntegrationType(account.integrationAccountType ?? "");
+              setDetailType(account.integrationDetailType ?? "");
               setRefTable(account.sourceReferenceTable ?? "");
               setExtRef(account.externalAccountRef ?? "");
               setMsg(null);

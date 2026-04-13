@@ -14,10 +14,10 @@ export const FINANCE_PALETTE_LINKS: FinancePaletteLink[] = [
 
   { href: "/finance/integration", label: "Integration hub", group: "Integration", keywords: "pack 002" },
   {
-    href: "/finance/integration/quickbooks",
-    label: "QuickBooks Online",
+    href: "/finance/integration/accounting-oauth",
+    label: "External accounting (OAuth)",
     group: "Integration",
-    keywords: "qbo oauth",
+    keywords: "oauth accounting integration",
   },
   { href: "/finance/integration/pipeline", label: "Event pipeline", group: "Integration" },
   { href: "/finance/integration/delivery-log", label: "API & webhook log", group: "Integration" },

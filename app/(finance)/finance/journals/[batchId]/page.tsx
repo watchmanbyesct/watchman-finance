@@ -1,3 +1,8 @@
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ModuleWorkspaceStatus } from "@/components/finance/module-workspace-status";

@@ -1,14 +1,25 @@
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { getAuthSession } from "@/lib/auth/resolve-session";
 import { getOptionalFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
-import { buildQboAuthorizationUrl, resolveQboRedirectUri } from "@/lib/integrations/qbo-oauth";
-import { insertQboOAuthState, pruneExpiredQboOAuthStates } from "@/lib/integrations/qbo-persistence";
+import {
+  buildAccountingAuthorizationUrl,
+  resolveAccountingOAuthRedirectUri,
+} from "@/lib/integrations/accounting-oauth";
+import {
+  insertAccountingOAuthState,
+  pruneExpiredAccountingOAuthStates,
+} from "@/lib/integrations/accounting-oauth-persistence";
 import { createSupabaseServerClient } from "@/lib/db/supabase-server";
 
 /**
- * GET /api/integrations/quickbooks/start
- * Authenticated user — stores CSRF state and redirects to Intuit OAuth.
+ * GET /api/integrations/accounting-oauth/start
+ * Authenticated user — stores CSRF state and redirects to the provider OAuth screen.
  */
 export async function GET(req: NextRequest) {
   const session = await getAuthSession();
@@ -33,17 +44,20 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const redirectUri = resolveQboRedirectUri(req.nextUrl.origin);
+    const redirectUri = resolveAccountingOAuthRedirectUri(req.nextUrl.origin);
     if (!redirectUri) {
       return NextResponse.json(
-        { error: "Set QBO_REDIRECT_URI or QBO_REDIRECT_USE_REQUEST_ORIGIN=1 (and register that URI in Intuit)." },
+        {
+          error:
+            "Set ACCOUNTING_OAUTH_REDIRECT_URI or ACCOUNTING_OAUTH_REDIRECT_USE_REQUEST_ORIGIN=1 (and register that URI in the developer app).",
+        },
         { status: 500 }
       );
     }
-    await pruneExpiredQboOAuthStates();
+    await pruneExpiredAccountingOAuthStates();
     const state = randomBytes(24).toString("hex");
-    await insertQboOAuthState(state, workspace.tenantId, pu.id);
-    const url = buildQboAuthorizationUrl(state, redirectUri);
+    await insertAccountingOAuthState(state, workspace.tenantId, pu.id);
+    const url = buildAccountingAuthorizationUrl(state, redirectUri);
     return NextResponse.redirect(url);
   } catch (e) {
     const msg = e instanceof Error ? e.message : "oauth_start_failed";

@@ -29,6 +29,10 @@ Run all migrations in strict sequence. Do not skip or reorder.
 022_watchman_finance_api_idempotency_webhooks.sql
 023_watchman_finance_workflow_permissions_019_022.sql
 024_watchman_finance_qbo_oauth_pack002.sql
+025_watchman_finance_qbd_coa_source_of_truth.sql
+026_watchman_finance_payroll_desktop_components.sql
+027_watchman_finance_account_categories_qbd.sql
+028_watchman_finance_neutral_integration_naming.sql
 ```
 
 ## How to Run
@@ -78,7 +82,7 @@ Do not continue to Pack 002 until Pack 001 passes all checks.
 
 After `002_watchman_finance_integration_staging.sql`:
 
-- [ ] `integration_systems` seeded (Launch, Operations, Finance, QuickBooks)
+- [ ] `integration_systems` seeded (Launch, Operations, Finance, external accounting OAuth)
 - [ ] `staged_employees`, `staged_time_entries`, and related staging tables exist
 - [ ] `finance_people` exists (depends on `branches` / `departments` / `locations` stubs in the same migration)
 - [ ] `public.has_active_tenant_membership` and `public.has_entity_scope` exist (used by RLS policies)

@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 /**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ *
  * Watchman Finance — Greenfield Bootstrap Script
  * -----------------------------------------------
  * Usage:
@@ -408,7 +411,7 @@ async function main() {
         name: cat.name,
         category_type: cat.category_type,
         normal_balance: cat.normal_balance,
-        qbd_account_type: cat.qbd_account_type,
+        integration_account_type: cat.integration_account_type,
         status: "active",
         updated_at: new Date().toISOString(),
       },

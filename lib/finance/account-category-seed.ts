@@ -5,7 +5,7 @@ export type AccountCategorySeedRow = {
   name: string;
   category_type: "asset" | "liability" | "equity" | "revenue" | "expense";
   normal_balance: "debit" | "credit";
-  qbd_account_type: string;
+  integration_account_type: string;
 };
 
 export const ACCOUNT_CATEGORY_SEED_ROWS = accountCategorySeed as AccountCategorySeedRow[];

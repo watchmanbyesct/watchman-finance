@@ -1,11 +1,11 @@
 import { createSupabaseAdminClient } from "@/lib/db/supabase-server";
-import type { QboTokenResponse } from "@/lib/integrations/qbo-oauth";
+import type { AccountingOAuthTokenResponse } from "@/lib/integrations/accounting-oauth";
 
 function expiresAt(secondsFromNow: number): string {
   return new Date(Date.now() + secondsFromNow * 1000).toISOString();
 }
 
-export async function insertQboOAuthState(
+export async function insertAccountingOAuthState(
   state: string,
   tenantId: string,
   platformUserId: string,
@@ -13,7 +13,7 @@ export async function insertQboOAuthState(
 ): Promise<void> {
   const admin = createSupabaseAdminClient();
   const expiresAtIso = new Date(Date.now() + ttlMinutes * 60 * 1000).toISOString();
-  const { error } = await admin.from("qbo_oauth_states").insert({
+  const { error } = await admin.from("accounting_oauth_states").insert({
     state,
     tenant_id: tenantId,
     platform_user_id: platformUserId,
@@ -22,14 +22,14 @@ export async function insertQboOAuthState(
   if (error) throw new Error(error.message);
 }
 
-export async function consumeQboOAuthState(
+export async function consumeAccountingOAuthState(
   state: string
 ): Promise<{ tenantId: string; platformUserId: string } | null> {
   const admin = createSupabaseAdminClient();
   const now = new Date().toISOString();
 
   const { data: row, error } = await admin
-    .from("qbo_oauth_states")
+    .from("accounting_oauth_states")
     .select("id, tenant_id, platform_user_id")
     .eq("state", state)
     .gt("expires_at", now)
@@ -37,22 +37,22 @@ export async function consumeQboOAuthState(
 
   if (error || !row) return null;
 
-  await admin.from("qbo_oauth_states").delete().eq("id", row.id);
+  await admin.from("accounting_oauth_states").delete().eq("id", row.id);
 
   return { tenantId: row.tenant_id as string, platformUserId: row.platform_user_id as string };
 }
 
-export async function pruneExpiredQboOAuthStates(): Promise<void> {
+export async function pruneExpiredAccountingOAuthStates(): Promise<void> {
   const admin = createSupabaseAdminClient();
   const now = new Date().toISOString();
-  await admin.from("qbo_oauth_states").delete().lt("expires_at", now);
+  await admin.from("accounting_oauth_states").delete().lt("expires_at", now);
 }
 
-export async function upsertQboCredentials(args: {
+export async function upsertAccountingOAuthCredentials(args: {
   tenantId: string;
   realmId: string;
   companyName: string | null;
-  tokens: QboTokenResponse;
+  tokens: AccountingOAuthTokenResponse;
 }): Promise<void> {
   const admin = createSupabaseAdminClient();
   const accessExpires = expiresAt(args.tokens.expires_in);
@@ -61,7 +61,7 @@ export async function upsertQboCredentials(args: {
       ? expiresAt(args.tokens.x_refresh_token_expires_in)
       : null;
 
-  const { error: credErr } = await admin.from("qbo_oauth_credentials").upsert(
+  const { error: credErr } = await admin.from("accounting_oauth_credentials").upsert(
     {
       tenant_id: args.tenantId,
       realm_id: args.realmId,
@@ -78,7 +78,7 @@ export async function upsertQboCredentials(args: {
   const { data: sys, error: sysErr } = await admin
     .from("integration_systems")
     .select("id")
-    .eq("system_key", "quickbooks_online")
+    .eq("system_key", "external_accounting_oauth")
     .single();
   if (sysErr || !sys) return;
 
@@ -100,16 +100,18 @@ export async function upsertQboCredentials(args: {
   if (connErr) throw new Error(connErr.message);
 }
 
-export type QboConnectionSummary = {
+export type AccountingOAuthConnectionSummary = {
   realmId: string;
   companyName: string | null;
   updatedAt: string;
 };
 
-export async function getQboConnectionSummary(tenantId: string): Promise<QboConnectionSummary | null> {
+export async function getAccountingOAuthConnectionSummary(
+  tenantId: string
+): Promise<AccountingOAuthConnectionSummary | null> {
   const admin = createSupabaseAdminClient();
   const { data, error } = await admin
-    .from("qbo_oauth_credentials")
+    .from("accounting_oauth_credentials")
     .select("realm_id, company_name, updated_at")
     .eq("tenant_id", tenantId)
     .maybeSingle();

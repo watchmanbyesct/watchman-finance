@@ -599,7 +599,7 @@ export function PayrollDesktopCatalogForm({ workspace }: { workspace: FinanceWor
     <div className="wf-card space-y-3">
       <h2 className="text-sm font-medium text-neutral-200">Desktop payroll items</h2>
       <p className="text-xs text-neutral-500 leading-relaxed">
-        Define earnings, deductions, taxes, and employer contribution items similar to QuickBooks Desktop payroll items.
+        Define earnings, deductions, taxes, and employer contribution items for desktop payroll configuration.
       </p>
       {msg && <p className="text-xs text-amber-400">{msg}</p>}
       <div className="flex flex-wrap gap-2">

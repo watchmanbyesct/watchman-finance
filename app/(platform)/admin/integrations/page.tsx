@@ -1,3 +1,8 @@
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 import Link from "next/link";
 import { AdminSubpage } from "@/components/admin/admin-subpage";
 
@@ -33,8 +38,8 @@ export default function Page() {
             </Link>
           </li>
           <li>
-            <Link href="/finance/integration/quickbooks" className="text-amber-500 hover:text-amber-400">
-              QuickBooks Online — OAuth (Pack 002 / 024)
+            <Link href="/finance/integration/accounting-oauth" className="text-amber-500 hover:text-amber-400">
+              External accounting (OAuth) — Pack 002 / 024
             </Link>
           </li>
         </ul>

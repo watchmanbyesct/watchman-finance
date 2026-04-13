@@ -1,3 +1,8 @@
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 import { requireAuthSession } from "@/lib/auth/resolve-session";
 import { FinanceSidebar } from "@/components/layout/finance-sidebar";
 import { FinanceTopbar } from "@/components/layout/finance-topbar";

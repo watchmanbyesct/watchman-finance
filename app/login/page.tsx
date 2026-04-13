@@ -1,3 +1,8 @@
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 import { Suspense } from "react";
 import { WatchmanLogo } from "@/components/branding/watchman-logo";
 import { LoginForm } from "@/components/shared/login-form";

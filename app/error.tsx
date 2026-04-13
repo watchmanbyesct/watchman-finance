@@ -1,5 +1,11 @@
 "use client";
 
+
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 import { useEffect } from "react";
 
 export default function Error({

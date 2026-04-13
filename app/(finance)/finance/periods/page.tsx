@@ -1,3 +1,8 @@
+/**
+ * Copyright 2026 ESCT Holdings Inc.
+ * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ */
+
 import { ModuleWorkspaceStatus } from "@/components/finance/module-workspace-status";
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import { getFiscalPeriodsByEntity } from "@/modules/finance-core/repositories/finance-core-repository";
