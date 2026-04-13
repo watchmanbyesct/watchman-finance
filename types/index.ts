@@ -84,6 +84,19 @@ export interface Account {
   name: string;
   description?: string | null;
   accountType: string;
+  qbdAccountType: string | null;
+  qbdDetailType: string | null;
+  sourceOfTruth:
+    | "gl_manual"
+    | "bank_register"
+    | "ar_subledger"
+    | "ap_subledger"
+    | "payroll_subledger"
+    | "inventory_subledger"
+    | "tax_subledger"
+    | "system";
+  sourceReferenceTable: string | null;
+  externalAccountRef: string | null;
   normalBalance: "debit" | "credit";
   allowPosting: boolean;
   isActive: boolean;

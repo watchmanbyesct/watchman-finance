@@ -33,11 +33,12 @@ async function assertPostableAccount(
   admin: SupabaseClient,
   tenantId: string,
   entityId: string,
-  accountId: string
+  accountId: string,
+  allowedSourceOfTruth: string[]
 ): Promise<void> {
   const { data, error } = await admin
     .from("accounts")
-    .select("id, allow_posting, is_active")
+    .select("id, allow_posting, is_active, source_of_truth")
     .eq("id", accountId)
     .eq("tenant_id", tenantId)
     .eq("entity_id", entityId)
@@ -45,6 +46,11 @@ async function assertPostableAccount(
   if (error || !data) throw new Error("GL binding account not found on entity.");
   if (!data.allow_posting || !data.is_active) {
     throw new Error("GL binding account must be active and allow posting.");
+  }
+  if (!allowedSourceOfTruth.includes(String(data.source_of_truth))) {
+    throw new Error(
+      `Account source-of-truth ${String(data.source_of_truth)} is not valid for this subledger event.`
+    );
   }
 }
 
@@ -92,6 +98,12 @@ export async function createPostedSubledgerJournal(
   if (existing?.journal_batch_id) {
     return { journalBatchId: existing.journal_batch_id as string };
   }
+  const allowedSourceOfTruthByDomain: Record<"ar" | "ap" | "payroll", string[]> = {
+    ar: ["ar_subledger", "bank_register", "system"],
+    ap: ["ap_subledger", "bank_register", "system"],
+    payroll: ["payroll_subledger", "system"],
+  };
+  const allowedSources = allowedSourceOfTruthByDomain[params.subledger.sourceDomain];
 
   let totalDebit = 0;
   let totalCredit = 0;
@@ -103,7 +115,7 @@ export async function createPostedSubledgerJournal(
     }
     totalDebit += d;
     totalCredit += c;
-    await assertPostableAccount(admin, params.tenantId, params.entityId, line.accountId);
+    await assertPostableAccount(admin, params.tenantId, params.entityId, line.accountId, allowedSources);
   }
   if (params.lines.length < 2) {
     throw new Error("At least two GL lines are required for subledger posting.");

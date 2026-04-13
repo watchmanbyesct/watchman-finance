@@ -200,6 +200,11 @@ function buildSetupChecklist(
       complete: PACK >= 24,
       href: "/finance/integration/quickbooks",
     },
+    {
+      label: "Pack 025 — QBD-style chart of accounts + account source-of-truth",
+      complete: PACK >= 25,
+      href: "/finance/accounts",
+    },
     { label: "ESCT Holdings tenant created", complete: true, href: null },
     {
       label: "ESCT entity — Enterprise Security Consulting and Training Inc.",
@@ -238,6 +243,7 @@ const MODULE_SCHEMA_STATUS: { name: string; ready: boolean }[] = [
   { name: "GL reversals & AP subledger", ready: PACK >= 18 },
   { name: "Evidence, approvals, TB cache & integration diagnostics", ready: PACK >= 23 },
   { name: "QuickBooks Online OAuth (Pack 002)", ready: PACK >= 24 },
+  { name: "QBD account taxonomy & source of truth", ready: PACK >= 25 },
 ];
 
 const QUICK_LINKS = [

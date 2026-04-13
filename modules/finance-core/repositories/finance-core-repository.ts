@@ -13,7 +13,8 @@ export async function getAccountsByEntity(
     .from("accounts")
     .select(`
       id, tenant_id, entity_id, account_category_id,
-      code, name, description, account_type, normal_balance,
+      code, name, description, account_type, qbd_account_type, qbd_detail_type, source_of_truth,
+      source_reference_table, external_account_ref, normal_balance,
       allow_posting, is_active, parent_account_id
     `)
     .eq("tenant_id", tenantId)
@@ -93,6 +94,11 @@ function rowToAccount(row: any): Account {
     name:              row.name,
     description:       row.description ?? null,
     accountType:       row.account_type,
+    qbdAccountType:    row.qbd_account_type ?? null,
+    qbdDetailType:     row.qbd_detail_type ?? null,
+    sourceOfTruth:     row.source_of_truth,
+    sourceReferenceTable: row.source_reference_table ?? null,
+    externalAccountRef: row.external_account_ref ?? null,
     normalBalance:     row.normal_balance,
     allowPosting:      row.allow_posting,
     isActive:          row.is_active,
