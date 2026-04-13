@@ -48,6 +48,20 @@ const UpdateTenantMembershipAdminSchema = z.object({
   membershipStatus:     z.enum(["active", "suspended"]).optional(),
 });
 
+const UpdatePlatformUserAdminSchema = z.object({
+  tenantId: z.string().uuid(),
+  targetPlatformUserId: z.string().uuid(),
+  email: z.string().email().optional(),
+  fullName: z.string().min(1).max(200).optional(),
+  platformStatus: z.enum(["active", "inactive"]).optional(),
+});
+
+const RemoveTenantMembershipSchema = z.object({
+  tenantId: z.string().uuid(),
+  targetPlatformUserId: z.string().uuid(),
+  deactivatePlatformUser: z.boolean().default(false),
+});
+
 const RevokeUserRoleAssignmentSchema = z.object({
   tenantId:     z.string().uuid(),
   assignmentId: z.string().uuid(),
@@ -422,6 +436,136 @@ export async function updateTenantMembershipAdmin(
 }
 
 /**
+ * Update profile fields on platform_users for a tenant member. Permission: user.invite
+ */
+export async function updatePlatformUserAdmin(
+  input: z.infer<typeof UpdatePlatformUserAdminSchema>,
+): Promise<ActionResult> {
+  try {
+    const parsed = UpdatePlatformUserAdminSchema.parse(input);
+    const ctx = await resolveRequestContext(parsed.tenantId);
+    requirePermission(ctx, "user.invite");
+
+    if (
+      parsed.email === undefined &&
+      parsed.fullName === undefined &&
+      parsed.platformStatus === undefined
+    ) {
+      return { success: false, message: "No profile changes provided." };
+    }
+
+    const admin = createSupabaseAdminClient();
+
+    const { data: membership } = await admin
+      .from("tenant_memberships")
+      .select("id")
+      .eq("tenant_id", parsed.tenantId)
+      .eq("platform_user_id", parsed.targetPlatformUserId)
+      .maybeSingle();
+
+    if (!membership) {
+      return { success: false, message: "User is not a member of this tenant." };
+    }
+
+    const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    if (parsed.email !== undefined) patch.email = parsed.email.toLowerCase().trim();
+    if (parsed.fullName !== undefined) patch.full_name = parsed.fullName.trim();
+    if (parsed.platformStatus !== undefined) patch.status = parsed.platformStatus;
+
+    const { error } = await admin
+      .from("platform_users")
+      .update(patch)
+      .eq("id", parsed.targetPlatformUserId);
+    if (error) return { success: false, message: `Could not update user profile: ${error.message}` };
+
+    await writeAuditLog({
+      tenantId: parsed.tenantId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "finance_core",
+      actionCode: "user.profile_update",
+      targetTable: "platform_users",
+      targetRecordId: parsed.targetPlatformUserId,
+      newValues: patch,
+    });
+
+    revalidatePath("/admin/users");
+    return { success: true, message: "User profile updated." };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+/**
+ * Remove user from tenant, revoke active role assignments, and optionally deactivate platform user.
+ * Permission: user.invite
+ */
+export async function removeTenantMembership(
+  input: z.infer<typeof RemoveTenantMembershipSchema>,
+): Promise<ActionResult> {
+  try {
+    const parsed = RemoveTenantMembershipSchema.parse(input);
+    const ctx = await resolveRequestContext(parsed.tenantId);
+    requirePermission(ctx, "user.invite");
+
+    const admin = createSupabaseAdminClient();
+
+    const { data: membership } = await admin
+      .from("tenant_memberships")
+      .select("id, membership_status")
+      .eq("tenant_id", parsed.tenantId)
+      .eq("platform_user_id", parsed.targetPlatformUserId)
+      .maybeSingle();
+    if (!membership) return { success: false, message: "Membership not found." };
+
+    const { error: roleErr } = await admin
+      .from("user_role_assignments")
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq("tenant_id", parsed.tenantId)
+      .eq("platform_user_id", parsed.targetPlatformUserId)
+      .eq("is_active", true);
+    if (roleErr) return { success: false, message: `Could not revoke role assignments: ${roleErr.message}` };
+
+    const { error: scopeErr } = await admin
+      .from("user_entity_scopes")
+      .delete()
+      .eq("tenant_id", parsed.tenantId)
+      .eq("platform_user_id", parsed.targetPlatformUserId);
+    if (scopeErr) return { success: false, message: `Could not remove entity scopes: ${scopeErr.message}` };
+
+    const { error: memErr } = await admin
+      .from("tenant_memberships")
+      .delete()
+      .eq("tenant_id", parsed.tenantId)
+      .eq("platform_user_id", parsed.targetPlatformUserId);
+    if (memErr) return { success: false, message: `Could not remove membership: ${memErr.message}` };
+
+    if (parsed.deactivatePlatformUser) {
+      const { error: puErr } = await admin
+        .from("platform_users")
+        .update({ status: "inactive", updated_at: new Date().toISOString() })
+        .eq("id", parsed.targetPlatformUserId);
+      if (puErr) return { success: false, message: `Membership removed, but deactivation failed: ${puErr.message}` };
+    }
+
+    await writeAuditLog({
+      tenantId: parsed.tenantId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "finance_core",
+      actionCode: "user.membership_remove",
+      targetTable: "tenant_memberships",
+      targetRecordId: parsed.targetPlatformUserId,
+      oldValues: membership,
+      newValues: { removed: true, deactivatePlatformUser: parsed.deactivatePlatformUser },
+    });
+
+    revalidatePath("/admin/users");
+    return { success: true, message: "User removed from tenant." };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+/**
  * Deactivate a role assignment (row kept for audit). Permission: user.role_assign
  */
 export async function revokeUserRoleAssignment(
@@ -474,7 +618,7 @@ export async function revokeUserRoleAssignment(
  */
 export async function inviteUserToTenant(
   input: z.infer<typeof InviteUserToTenantSchema>,
-): Promise<ActionResult<{ authUserId: string }>> {
+): Promise<ActionResult<{ authUserId?: string; platformUserId?: string; temporaryPassword?: string }>> {
   try {
     const parsed = InviteUserToTenantSchema.parse(input);
     const ctx = await resolveRequestContext(parsed.tenantId);
@@ -563,6 +707,7 @@ export async function inviteUserToTenant(
       return {
         success: true,
         message: "Existing platform user added to tenant (membership + scope updated).",
+        data: { platformUserId: existingPlatformUser.id },
       };
     }
 
@@ -582,7 +727,11 @@ export async function inviteUserToTenant(
         email: normalizedEmail,
         password: temporaryPassword!,
         email_confirm: true,
-        user_metadata: { full_name: parsed.fullName },
+        user_metadata: {
+          full_name: parsed.fullName,
+          require_password_change: true,
+          require_password_change_at: new Date().toISOString(),
+        },
       });
 
       if (createErr) {
@@ -695,9 +844,13 @@ export async function inviteUserToTenant(
       success: true,
       message:
         parsed.inviteMode === "temporary_password"
-          ? `User created without email delivery. Temporary password: ${temporaryPassword}`
+          ? "User created with temporary password. Require password change is enabled for first login."
           : "Invite sent. They will receive email to set a password (if your Supabase Auth templates are enabled).",
-      data:    { authUserId },
+      data: {
+        authUserId,
+        platformUserId: puRow.id,
+        temporaryPassword: parsed.inviteMode === "temporary_password" ? temporaryPassword ?? undefined : undefined,
+      },
     };
   } catch (err) {
     return mapErrorToResult(err);

@@ -8,9 +8,18 @@ import {
   addTenantMembership,
   assignUserRole,
   inviteUserToTenant,
+  removeTenantMembership,
   revokeUserRoleAssignment,
+  updatePlatformUserAdmin,
   updateTenantMembershipAdmin,
 } from "@/modules/platform/actions/platform-actions";
+
+type UiActionResult<T = unknown> = {
+  success: boolean;
+  message: string;
+  errors?: Array<{ message: string }>;
+  data?: T;
+};
 
 type Props = {
   tenants: TenantAdminOption[];
@@ -23,14 +32,25 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
   const [pending, start] = useTransition();
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
   const [inviteMode, setInviteMode] = useState<"email" | "temporary_password">("email");
+  const [inviteTempPassword, setInviteTempPassword] = useState("");
+  const [showInviteTempPassword, setShowInviteTempPassword] = useState(false);
+  const [showIssuedTempPassword, setShowIssuedTempPassword] = useState(false);
+  const [issuedTempCredential, setIssuedTempCredential] = useState<{ email: string; password: string } | null>(null);
+  const [rolePrefillUserId, setRolePrefillUserId] = useState<string | null>(null);
+  const [roleCta, setRoleCta] = useState<{ platformUserId: string; email: string } | null>(null);
 
-  function handleActionResult(result: {
-    success: boolean;
-    message: string;
-    errors?: Array<{ message: string }>;
-  }) {
+  function beginAction() {
+    setNotice(null);
+  }
+
+  function handleActionResult<T>(
+    actionLabel: string,
+    result: UiActionResult<T>,
+    onSuccess?: (data: T | undefined) => void,
+  ) {
     if (result.success) {
-      setNotice({ kind: "ok", text: result.message });
+      setNotice({ kind: "ok", text: `${actionLabel}: ${result.message}` });
+      onSuccess?.(result.data);
       router.refresh();
     } else {
       const detail = result.errors?.[0]?.message;
@@ -38,8 +58,20 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
         result.message.includes("An internal error occurred") && detail
           ? `${result.message} (${detail})`
           : result.message;
-      setNotice({ kind: "err", text: fullText });
+      setNotice({ kind: "err", text: `${actionLabel} failed: ${fullText}` });
     }
+  }
+
+  function runAction<T>(
+    actionLabel: string,
+    action: () => Promise<UiActionResult<T>>,
+    onSuccess?: (data: T | undefined) => void,
+  ) {
+    beginAction();
+    start(async () => {
+      const result = await action();
+      handleActionResult(actionLabel, result, onSuccess);
+    });
   }
 
   const memberByUserId = new Map(snapshot.memberships.map((m) => [m.platformUserId, m]));
@@ -87,11 +119,51 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
       {snapshot.canInvite && snapshot.entities.length > 0 ? (
         <section className="wf-card space-y-4">
           <div>
-            <h2 className="wf-section-title">Invite by email</h2>
+            <h2 className="wf-section-title">Create or Invite User</h2>
             <p className="mt-1 text-xs text-neutral-500">
-              Supports either email invite or direct temporary-password setup when SMTP is unavailable.
+              {inviteMode === "email"
+                ? "Send a standard email invite (requires Supabase email delivery)."
+                : "Create immediately with a temporary password when SMTP is unavailable."}
             </p>
           </div>
+          {issuedTempCredential ? (
+            <div className="rounded-lg border border-amber-500/25 bg-amber-950/20 px-3 py-2.5 text-xs text-amber-200">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-medium">Temporary credential issued for {issuedTempCredential.email}</p>
+                <button
+                  type="button"
+                  className="text-amber-300 hover:text-amber-200"
+                  onClick={() => setIssuedTempCredential(null)}
+                >
+                  Dismiss
+                </button>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <code className="rounded bg-black/30 px-2 py-1">
+                  {showIssuedTempPassword ? issuedTempCredential.password : "••••••••••••"}
+                </code>
+                <button
+                  type="button"
+                  className="rounded border border-amber-500/35 px-2 py-1 text-[11px] hover:bg-amber-500/10"
+                  onClick={() => setShowIssuedTempPassword((v) => !v)}
+                >
+                  {showIssuedTempPassword ? "Hide" : "Reveal"}
+                </button>
+                <button
+                  type="button"
+                  className="rounded border border-amber-500/35 px-2 py-1 text-[11px] hover:bg-amber-500/10"
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(issuedTempCredential.password);
+                  }}
+                >
+                  Copy
+                </button>
+              </div>
+              <p className="mt-2 text-[11px] text-amber-300/85">
+                Require password change on first login is flagged in user metadata.
+              </p>
+            </div>
+          ) : null}
           <form
             className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4"
             onSubmit={(e) => {
@@ -104,18 +176,31 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
               const selectedInviteMode = String(fd.get("invite_mode") ?? "email") as
                 | "email"
                 | "temporary_password";
-              const temporaryPassword = String(fd.get("invite_temp_password") ?? "").trim();
-              start(async () => {
-                const r = await inviteUserToTenant({
+              runAction("User creation", async () => {
+                return inviteUserToTenant({
                   tenantId,
                   email,
                   fullName,
                   defaultEntityId,
                   roleId: roleId ? roleId : undefined,
                   inviteMode: selectedInviteMode,
-                  temporaryPassword: selectedInviteMode === "temporary_password" ? temporaryPassword || undefined : undefined,
+                  temporaryPassword:
+                    selectedInviteMode === "temporary_password" ? inviteTempPassword.trim() || undefined : undefined,
                 });
-                handleActionResult(r);
+              }, (data) => {
+                const platformUserId = (data as { platformUserId?: string } | undefined)?.platformUserId;
+                const temporaryPassword = (data as { temporaryPassword?: string } | undefined)?.temporaryPassword;
+                if (selectedInviteMode === "temporary_password" && temporaryPassword) {
+                  setIssuedTempCredential({ email, password: temporaryPassword });
+                  setShowIssuedTempPassword(false);
+                }
+                if (platformUserId && !roleId && snapshot.canAssignRoles) {
+                  setRoleCta({ platformUserId, email });
+                  setRolePrefillUserId(platformUserId);
+                } else {
+                  setRoleCta(null);
+                }
+                setInviteTempPassword("");
               });
             }}
           >
@@ -138,12 +223,33 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
               ))}
             </select>
             {inviteMode === "temporary_password" ? (
-              <input
-                name="invite_temp_password"
-                type="text"
-                placeholder="Temporary password (optional)"
-                className="wf-input sm:col-span-2"
-              />
+              <div className="sm:col-span-2 flex items-center gap-2">
+                <input
+                  name="invite_temp_password"
+                  type={showInviteTempPassword ? "text" : "password"}
+                  value={inviteTempPassword}
+                  onChange={(e) => setInviteTempPassword(e.target.value)}
+                  placeholder="Temporary password (optional, auto-generated if blank)"
+                  className="wf-input"
+                />
+                <button
+                  type="button"
+                  className="rounded border border-white/15 px-2 py-1 text-xs text-neutral-300 hover:bg-white/5"
+                  onClick={() => setShowInviteTempPassword((v) => !v)}
+                >
+                  {showInviteTempPassword ? "Hide" : "Reveal"}
+                </button>
+                <button
+                  type="button"
+                  className="rounded border border-white/15 px-2 py-1 text-xs text-neutral-300 hover:bg-white/5"
+                  onClick={async () => {
+                    if (!inviteTempPassword) return;
+                    await navigator.clipboard.writeText(inviteTempPassword);
+                  }}
+                >
+                  Copy
+                </button>
+              </div>
             ) : null}
             <select name="invite_role" className="wf-input">
               <option value="">No role yet</option>
@@ -164,6 +270,25 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
         </section>
       ) : null}
 
+      {roleCta && snapshot.canAssignRoles ? (
+        <div className="rounded-lg border border-sky-500/30 bg-sky-950/20 px-4 py-3 text-sm text-sky-200">
+          <p>
+            User created. Next step: assign a role for <strong>{roleCta.email}</strong>.
+          </p>
+          <button
+            type="button"
+            className="mt-2 rounded border border-sky-500/35 px-3 py-1.5 text-xs text-sky-200 hover:bg-sky-500/10"
+            onClick={() => {
+              const el = document.getElementById("assign-role-user-select");
+              el?.scrollIntoView({ behavior: "smooth", block: "center" });
+              (el as HTMLSelectElement | null)?.focus();
+            }}
+          >
+            Assign role now
+          </button>
+        </div>
+      ) : null}
+
       {snapshot.canInvite && snapshot.platformUsersNotInTenant.length > 0 ? (
         <section className="wf-card space-y-4">
           <div>
@@ -180,13 +305,12 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
               const fd = new FormData(e.currentTarget);
               const targetPlatformUserId = String(fd.get("add_user") ?? "");
               const ent = String(fd.get("add_entity") ?? "");
-              start(async () => {
-                const r = await addTenantMembership({
+              runAction("Membership add", async () => {
+                return addTenantMembership({
                   tenantId,
                   targetPlatformUserId,
                   defaultEntityId: ent ? ent : null,
                 });
-                handleActionResult(r);
               });
             }}
           >
@@ -247,15 +371,14 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
                       const membershipStatus = String(fd.get("mem_status") ?? "active") as
                         | "active"
                         | "suspended";
-                      start(async () => {
-                        const r = await updateTenantMembershipAdmin({
+                      runAction("Membership update", async () => {
+                        return updateTenantMembershipAdmin({
                           tenantId,
                           targetPlatformUserId: m.platformUserId,
                           defaultEntityId:
                             defaultEntityIdRaw === "" ? null : defaultEntityIdRaw,
                           membershipStatus,
                         });
-                        handleActionResult(r);
                       });
                     }}
                   >
@@ -287,6 +410,71 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
                       Save
                     </button>
                   </form>
+                  <form
+                    className="mt-2 flex flex-wrap items-center gap-2"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const fd = new FormData(e.currentTarget);
+                      const fullName = String(fd.get("profile_name") ?? "").trim();
+                      const email = String(fd.get("profile_email") ?? "").trim();
+                      const platformStatus = String(fd.get("profile_status") ?? "active") as
+                        | "active"
+                        | "inactive";
+                      runAction("User profile update", async () => {
+                        return updatePlatformUserAdmin({
+                          tenantId,
+                          targetPlatformUserId: m.platformUserId,
+                          fullName,
+                          email,
+                          platformStatus,
+                        });
+                      });
+                    }}
+                  >
+                    <input
+                      name="profile_name"
+                      defaultValue={m.fullName}
+                      className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-neutral-200 min-w-[12rem]"
+                    />
+                    <input
+                      name="profile_email"
+                      type="email"
+                      defaultValue={m.email}
+                      className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-neutral-200 min-w-[14rem]"
+                    />
+                    <select
+                      name="profile_status"
+                      defaultValue={m.platformStatus}
+                      className="rounded border border-white/10 bg-white/5 px-2 py-1 text-xs text-neutral-200"
+                    >
+                      <option value="active">active</option>
+                      <option value="inactive">inactive</option>
+                    </select>
+                    <button
+                      type="submit"
+                      className="rounded border border-white/15 px-2 py-1 text-xs text-sky-400 hover:bg-white/5"
+                      disabled={pending || !snapshot.canInvite}
+                    >
+                      Save profile
+                    </button>
+                    <button
+                      type="button"
+                      className="rounded border border-red-500/30 px-2 py-1 text-xs text-red-300 hover:bg-red-950/30"
+                      disabled={pending || !snapshot.canInvite}
+                      onClick={() => {
+                        if (!window.confirm(`Remove ${m.email} from this tenant?`)) return;
+                        runAction("User remove", async () => {
+                          return removeTenantMembership({
+                            tenantId,
+                            targetPlatformUserId: m.platformUserId,
+                            deactivatePlatformUser: false,
+                          });
+                        });
+                      }}
+                    >
+                      Remove user
+                    </button>
+                  </form>
                 </td>
               </tr>
             ))}
@@ -307,15 +495,23 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
               const fd = new FormData(e.currentTarget);
               const targetPlatformUserId = String(fd.get("role_user") ?? "");
               const roleId = String(fd.get("role_id") ?? "");
-              start(async () => {
-                const r = await assignUserRole({ tenantId, targetPlatformUserId, roleId });
-                handleActionResult(r);
+              runAction("Role assignment", async () => {
+                return assignUserRole({ tenantId, targetPlatformUserId, roleId });
+              }, () => {
+                setRoleCta(null);
               });
             }}
           >
             <label className="block flex-1 min-w-[12rem] text-sm text-neutral-400">
               <span className="mb-1 block text-xs text-neutral-500">Member</span>
-              <select name="role_user" required className="wf-input">
+              <select
+                id="assign-role-user-select"
+                name="role_user"
+                required
+                className="wf-input"
+                value={rolePrefillUserId ?? snapshot.memberships.find((m) => m.membershipStatus === "active")?.platformUserId ?? ""}
+                onChange={(e) => setRolePrefillUserId(e.target.value)}
+              >
                 {snapshot.memberships
                   .filter((m) => m.membershipStatus === "active")
                   .map((m) => (
@@ -371,12 +567,11 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
                         className="text-xs text-red-400 hover:text-red-300"
                         disabled={pending}
                         onClick={() => {
-                          start(async () => {
-                            const r = await revokeUserRoleAssignment({
+                          runAction("Role revoke", async () => {
+                            return revokeUserRoleAssignment({
                               tenantId,
                               assignmentId: a.id,
                             });
-                            handleActionResult(r);
                           });
                         }}
                       >
