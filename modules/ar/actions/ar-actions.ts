@@ -5,6 +5,11 @@ import { resolveRequestContext } from "@/lib/context/resolve-request-context";
 import { requirePermission, requireEntityScope, requireModuleEntitlement } from "@/lib/permissions/require-permission";
 import { writeAuditLog } from "@/lib/audit/write-audit-log";
 import { mapErrorToResult, type ActionResult } from "@/lib/errors/app-error";
+import {
+  tryPostArInvoiceIssueReversalGl,
+  tryPostArInvoiceIssueToGl,
+  tryPostArInvoicePaymentToGl,
+} from "@/modules/finance-core/lib/subledger-gl-post";
 import { z } from "zod";
 
 const InvoiceLineSchema = z.object({
@@ -315,6 +320,19 @@ export async function issueInvoice(input: {
       newValues: { invoice_status: "issued", issueDate, dueDate },
     });
 
+    try {
+      await tryPostArInvoiceIssueToGl(admin, ctx, {
+        tenantId: input.tenantId,
+        entityId: input.entityId,
+        invoiceId: input.invoiceId,
+        issueDate,
+        invoiceNumber: invoice.invoice_number,
+        totalAmount: Number(invoice.total_amount),
+      });
+    } catch {
+      /* GL automation is best-effort when Pack 017 bindings are incomplete or journals conflict */
+    }
+
     return { success: true, message: `Invoice ${invoice.invoice_number} issued.` };
   } catch (err) {
     return mapErrorToResult(err);
@@ -389,6 +407,18 @@ export async function voidInvoice(input: {
       oldValues: { invoice_status: invoice.invoice_status },
       newValues: { invoice_status: "void", reason: input.reason },
     });
+
+    try {
+      await tryPostArInvoiceIssueReversalGl(admin, ctx, {
+        tenantId: input.tenantId,
+        entityId: input.entityId,
+        invoiceId: input.invoiceId,
+        journalDate: new Date().toISOString().slice(0, 10),
+        invoiceNumber: invoice.invoice_number,
+      });
+    } catch {
+      /* GL reversal is best-effort when no issue posting exists */
+    }
 
     return { success: true, message: `Invoice ${invoice.invoice_number} voided.` };
   } catch (err) {
@@ -542,7 +572,7 @@ export async function recordInvoicePayment(
     if (validated.invoiceId) {
       const { data: inv, error: ie } = await admin
         .from("invoices")
-        .select("id, invoice_status, balance_due, total_amount")
+        .select("id, invoice_number, invoice_status, balance_due, total_amount")
         .eq("id", validated.invoiceId)
         .eq("tenant_id", validated.tenantId)
         .eq("entity_id", validated.entityId)
@@ -606,6 +636,21 @@ export async function recordInvoicePayment(
         newValues: { amountApplied, invoiceId: validated.invoiceId },
       });
 
+      if (amountApplied > 0) {
+        try {
+          await tryPostArInvoicePaymentToGl(admin, ctx, {
+            tenantId: validated.tenantId,
+            entityId: validated.entityId,
+            paymentId: payRow.id,
+            paymentDate: validated.paymentDate,
+            amountApplied,
+            invoiceNumber: inv.invoice_number as string,
+          });
+        } catch {
+          /* best-effort GL when Pack 017 bindings exist */
+        }
+      }
+
       return { success: true, message: "Payment recorded.", data: { paymentId: payRow.id } };
     }
 
@@ -642,6 +687,220 @@ export async function recordInvoicePayment(
     });
 
     return { success: true, message: "Payment recorded (unapplied).", data: { paymentId: payRow.id } };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+const CreateCreditMemoSchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid(),
+  customerId: z.string().uuid(),
+  memoNumber: z.string().min(1).max(50),
+  totalAmount: z.number(),
+  issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  invoiceId: z.string().uuid().optional(),
+  reason: z.string().max(2000).optional(),
+});
+
+/** Draft credit memo shell (application to invoices deferred). Permission: ar.invoice.create */
+export async function createCreditMemo(
+  input: z.infer<typeof CreateCreditMemoSchema>
+): Promise<ActionResult<{ creditMemoId: string }>> {
+  try {
+    const v = CreateCreditMemoSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requireModuleEntitlement(ctx, "ar");
+    requirePermission(ctx, "ar.invoice.create");
+    requireEntityScope(ctx, v.entityId);
+
+    const admin = createSupabaseAdminClient();
+
+    const { data: cust, error: ce } = await admin
+      .from("customers")
+      .select("id")
+      .eq("id", v.customerId)
+      .eq("tenant_id", v.tenantId)
+      .single();
+    if (ce || !cust) return { success: false, message: "Customer not found for this tenant." };
+
+    if (v.invoiceId) {
+      const { data: inv, error: ie } = await admin
+        .from("invoices")
+        .select("id, customer_id, entity_id")
+        .eq("id", v.invoiceId)
+        .eq("tenant_id", v.tenantId)
+        .single();
+      if (ie || !inv || inv.entity_id !== v.entityId || inv.customer_id !== v.customerId) {
+        return { success: false, message: "Invoice not found for this customer and entity." };
+      }
+    }
+
+    const amt = Number(v.totalAmount.toFixed(2));
+    const { data: row, error } = await admin
+      .from("credit_memos")
+      .insert({
+        tenant_id: v.tenantId,
+        entity_id: v.entityId,
+        customer_id: v.customerId,
+        invoice_id: v.invoiceId ?? null,
+        memo_number: v.memoNumber,
+        memo_status: "draft",
+        issue_date: v.issueDate ?? null,
+        total_amount: amt,
+        remaining_amount: amt,
+        reason: v.reason ?? null,
+        created_by: ctx.platformUserId,
+      })
+      .select("id")
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: v.entityId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "ar",
+      actionCode: "ar.credit_memo.create",
+      targetTable: "credit_memos",
+      targetRecordId: row.id,
+      newValues: { memoNumber: v.memoNumber, totalAmount: amt },
+    });
+
+    return { success: true, message: "Credit memo created (draft).", data: { creditMemoId: row.id } };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+const CreateArStatementRunSchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid(),
+  customerId: z.string().uuid(),
+  statementThroughDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  outputFormat: z.enum(["summary", "pdf", "csv"]).default("summary"),
+});
+
+/** Permission: ar.collection.manage */
+export async function createArStatementRun(
+  input: z.infer<typeof CreateArStatementRunSchema>
+): Promise<ActionResult<{ statementRunId: string }>> {
+  try {
+    const v = CreateArStatementRunSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requireModuleEntitlement(ctx, "ar");
+    requirePermission(ctx, "ar.collection.manage");
+    requireEntityScope(ctx, v.entityId);
+
+    const admin = createSupabaseAdminClient();
+    const { data: cust, error: ce } = await admin
+      .from("customers")
+      .select("id, entity_id")
+      .eq("id", v.customerId)
+      .eq("tenant_id", v.tenantId)
+      .single();
+    if (ce || !cust) return { success: false, message: "Customer not found." };
+    if (cust.entity_id != null && cust.entity_id !== v.entityId) {
+      return { success: false, message: "Customer is not scoped to this entity." };
+    }
+
+    const { data: row, error } = await admin
+      .from("ar_statement_runs")
+      .insert({
+        tenant_id: v.tenantId,
+        entity_id: v.entityId,
+        customer_id: v.customerId,
+        statement_through_date: v.statementThroughDate,
+        output_format: v.outputFormat,
+        run_status: "requested",
+        result_json: {},
+        created_by: ctx.platformUserId,
+      })
+      .select("id")
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: v.entityId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "ar",
+      actionCode: "ar.statement_run.create",
+      targetTable: "ar_statement_runs",
+      targetRecordId: row.id,
+      newValues: { customerId: v.customerId, through: v.statementThroughDate },
+    });
+
+    return { success: true, message: "Statement run requested.", data: { statementRunId: row.id } };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+const CreateArCollectionTaskSchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid(),
+  customerId: z.string().uuid(),
+  caseCode: z.string().min(1).max(64),
+  subject: z.string().min(1).max(255),
+  priority: z.enum(["low", "normal", "high", "critical"]).default("normal"),
+  notes: z.string().max(2000).optional(),
+});
+
+/** Permission: ar.collection.manage */
+export async function createArCollectionTask(
+  input: z.infer<typeof CreateArCollectionTaskSchema>
+): Promise<ActionResult<{ collectionTaskId: string }>> {
+  try {
+    const v = CreateArCollectionTaskSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requireModuleEntitlement(ctx, "ar");
+    requirePermission(ctx, "ar.collection.manage");
+    requireEntityScope(ctx, v.entityId);
+
+    const admin = createSupabaseAdminClient();
+    const { data: cust, error: ce } = await admin
+      .from("customers")
+      .select("id, entity_id")
+      .eq("id", v.customerId)
+      .eq("tenant_id", v.tenantId)
+      .single();
+    if (ce || !cust) return { success: false, message: "Customer not found." };
+    if (cust.entity_id != null && cust.entity_id !== v.entityId) {
+      return { success: false, message: "Customer is not scoped to this entity." };
+    }
+
+    const { data: row, error } = await admin
+      .from("ar_collection_tasks")
+      .insert({
+        tenant_id: v.tenantId,
+        entity_id: v.entityId,
+        customer_id: v.customerId,
+        case_code: v.caseCode,
+        subject: v.subject,
+        task_status: "open",
+        priority: v.priority,
+        notes: v.notes ?? null,
+      })
+      .select("id")
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: v.entityId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "ar",
+      actionCode: "ar.collection_task.create",
+      targetTable: "ar_collection_tasks",
+      targetRecordId: row.id,
+      newValues: { caseCode: v.caseCode },
+    });
+
+    return { success: true, message: "Collection task created.", data: { collectionTaskId: row.id } };
   } catch (err) {
     return mapErrorToResult(err);
   }

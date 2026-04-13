@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { createSupabaseAdminClient } from "@/lib/db/supabase-server";
 import { resolveRequestContext } from "@/lib/context/resolve-request-context";
 import { requirePermission, requireEntityScope } from "@/lib/permissions/require-permission";
@@ -26,9 +27,19 @@ const CreateAccountSchema = z.object({
   name:              z.string().min(1).max(255),
   accountType:       z.string().min(1),
   normalBalance:     z.enum(["debit", "credit"]),
-  allowPosting:      z.boolean().default(true),
-  parentAccountId:   z.string().uuid().optional(),
-  description:       z.string().optional(),
+  allowPosting: z.preprocess((v) => {
+    if (v === undefined || v === null || v === "") return true;
+    if (v === false || v === "false") return false;
+    return v === true || v === "true" || v === "on";
+  }, z.boolean()),
+  parentAccountId: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : v),
+    z.string().uuid().optional()
+  ),
+  description: z.preprocess(
+    (v) => (v === "" || v === null || v === undefined ? undefined : v),
+    z.string().optional()
+  ),
 });
 
 const CreateFiscalPeriodSchema = z.object({
@@ -37,8 +48,12 @@ const CreateFiscalPeriodSchema = z.object({
   periodName:  z.string().min(1).max(100),
   startDate:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
   endDate:     z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  fiscalYear:  z.number().int().min(2000).max(2100),
-  fiscalMonth: z.number().int().min(1).max(12).optional(),
+  fiscalYear:  z.coerce.number().int().min(2000).max(2100),
+  fiscalMonth: z.preprocess((v) => {
+    if (v === undefined || v === null || v === "") return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  }, z.number().int().min(1).max(12).optional()),
 });
 
 const UpdateAccountSchema = z.object({
@@ -185,6 +200,8 @@ export async function createAccount(
       newValues:           input,
     });
 
+    revalidatePath("/finance/accounts");
+
     return {
       success: true,
       message: `Account ${input.code} — ${input.name} created.`,
@@ -255,6 +272,8 @@ export async function createFiscalPeriod(
       targetRecordId:      period.id,
       newValues:           input,
     });
+
+    revalidatePath("/finance/periods");
 
     return {
       success: true,
@@ -328,6 +347,8 @@ export async function closeFiscalPeriod(input: {
       oldValues:           { status: period.status },
       newValues:           { status: "closed" },
     });
+
+    revalidatePath("/finance/periods");
 
     return { success: true, message: "Fiscal period closed." };
   } catch (err) {
@@ -407,6 +428,8 @@ export async function updateAccount(
       newValues:           patch,
     });
 
+    revalidatePath("/finance/accounts");
+
     return { success: true, message: "Account updated." };
   } catch (err) {
     return mapErrorToResult(err);
@@ -457,6 +480,8 @@ export async function archiveAccount(input: {
       oldValues:           { is_active: true },
       newValues:           { is_active: false },
     });
+
+    revalidatePath("/finance/accounts");
 
     return { success: true, message: `Account ${row.code} archived.` };
   } catch (err) {
@@ -539,8 +564,468 @@ export async function reopenFiscalPeriod(input: {
       newValues:           { status: "open", reason: input.reopenReason.trim() },
     });
 
+    revalidatePath("/finance/periods");
+
     return { success: true, message: "Fiscal period reopened." };
   } catch (err) {
     return mapErrorToResult(err);
   }
+}
+
+// ── GL journal batches & lines (Pack 016) ───────────────────────────────────
+
+const CreateGlJournalBatchSchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid(),
+  journalNumber: z.string().min(1).max(64),
+  journalDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  description: z.string().max(2000).optional(),
+  fiscalPeriodId: z.string().uuid().optional(),
+});
+
+/** Permission: journal.post */
+export async function createGlJournalBatch(
+  input: z.infer<typeof CreateGlJournalBatchSchema>
+): Promise<ActionResult<{ journalBatchId: string }>> {
+  try {
+    const v = CreateGlJournalBatchSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requirePermission(ctx, "journal.post");
+    requireEntityScope(ctx, v.entityId);
+
+    const admin = createSupabaseAdminClient();
+    if (v.fiscalPeriodId) {
+      const { data: fp, error: fe } = await admin
+        .from("fiscal_periods")
+        .select("id, entity_id, status")
+        .eq("id", v.fiscalPeriodId)
+        .eq("tenant_id", v.tenantId)
+        .single();
+      if (fe || !fp || fp.entity_id !== v.entityId) {
+        return { success: false, message: "Fiscal period not found for this entity." };
+      }
+    }
+
+    const { data: row, error } = await admin
+      .from("gl_journal_batches")
+      .insert({
+        tenant_id: v.tenantId,
+        entity_id: v.entityId,
+        fiscal_period_id: v.fiscalPeriodId ?? null,
+        journal_number: v.journalNumber.trim(),
+        journal_date: v.journalDate,
+        description: v.description?.trim() ?? null,
+        batch_status: "draft",
+        created_by: ctx.platformUserId,
+      })
+      .select("id")
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: v.entityId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "finance_core",
+      actionCode: "gl.journal_batch.create",
+      targetTable: "gl_journal_batches",
+      targetRecordId: row.id,
+      newValues: { journalNumber: v.journalNumber },
+    });
+
+    revalidatePath("/finance/journals");
+    revalidatePath(`/finance/journals/${row.id}`);
+
+    return { success: true, message: "Journal batch created.", data: { journalBatchId: row.id } };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+const AddGlJournalLineSchema = z.object({
+  tenantId: z.string().uuid(),
+  journalBatchId: z.string().uuid(),
+  accountId: z.string().uuid(),
+  memo: z.string().max(500).optional(),
+  debitAmount: z.number().min(0),
+  creditAmount: z.number().min(0),
+});
+
+/** Permission: journal.post */
+export async function addGlJournalLine(
+  input: z.infer<typeof AddGlJournalLineSchema>
+): Promise<ActionResult<{ lineId: string }>> {
+  try {
+    const v = AddGlJournalLineSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requirePermission(ctx, "journal.post");
+
+    const admin = createSupabaseAdminClient();
+    const { data: batch, error: be } = await admin
+      .from("gl_journal_batches")
+      .select("id, entity_id, batch_status")
+      .eq("id", v.journalBatchId)
+      .eq("tenant_id", v.tenantId)
+      .single();
+    if (be || !batch) return { success: false, message: "Journal batch not found." };
+    if (batch.batch_status !== "draft") return { success: false, message: "Only draft journals accept lines." };
+    requireEntityScope(ctx, batch.entity_id);
+
+    const debit = Number(v.debitAmount.toFixed(2));
+    const credit = Number(v.creditAmount.toFixed(2));
+    if ((debit > 0 && credit > 0) || (debit === 0 && credit === 0)) {
+      return { success: false, message: "Enter either a debit or a credit amount (not both, not zero)." };
+    }
+
+    const { data: acct, error: ae } = await admin
+      .from("accounts")
+      .select("id, entity_id, allow_posting, is_active")
+      .eq("id", v.accountId)
+      .eq("tenant_id", v.tenantId)
+      .single();
+    if (ae || !acct || acct.entity_id !== batch.entity_id) {
+      return { success: false, message: "Account not found on this entity." };
+    }
+    if (!acct.allow_posting || !acct.is_active) {
+      return { success: false, message: "Account is not active for posting." };
+    }
+
+    const { data: maxRow } = await admin
+      .from("gl_journal_lines")
+      .select("line_number")
+      .eq("journal_batch_id", v.journalBatchId)
+      .order("line_number", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const nextLine = (maxRow?.line_number ?? 0) + 1;
+
+    const { data: line, error: le } = await admin
+      .from("gl_journal_lines")
+      .insert({
+        tenant_id: v.tenantId,
+        journal_batch_id: v.journalBatchId,
+        line_number: nextLine,
+        account_id: v.accountId,
+        memo: v.memo?.trim() ?? null,
+        debit_amount: debit,
+        credit_amount: credit,
+      })
+      .select("id")
+      .single();
+
+    if (le) throw new Error(le.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: batch.entity_id,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "finance_core",
+      actionCode: "gl.journal_line.add",
+      targetTable: "gl_journal_lines",
+      targetRecordId: line.id,
+      newValues: { lineNumber: nextLine, debit, credit },
+    });
+
+    revalidatePath("/finance/journals");
+    revalidatePath(`/finance/journals/${v.journalBatchId}`);
+
+    return { success: true, message: "Line added.", data: { lineId: line.id } };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+const DeleteGlJournalLineSchema = z.object({
+  tenantId: z.string().uuid(),
+  journalLineId: z.string().uuid(),
+});
+
+/** Permission: journal.post */
+export async function deleteGlJournalLine(
+  input: z.infer<typeof DeleteGlJournalLineSchema>
+): Promise<ActionResult<void>> {
+  try {
+    const v = DeleteGlJournalLineSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requirePermission(ctx, "journal.post");
+
+    const admin = createSupabaseAdminClient();
+    const { data: line, error: le } = await admin
+      .from("gl_journal_lines")
+      .select("id, journal_batch_id, tenant_id")
+      .eq("id", v.journalLineId)
+      .eq("tenant_id", v.tenantId)
+      .single();
+    if (le || !line) return { success: false, message: "Line not found." };
+
+    const { data: batch, error: be } = await admin
+      .from("gl_journal_batches")
+      .select("id, entity_id, batch_status")
+      .eq("id", line.journal_batch_id)
+      .single();
+    if (be || !batch || batch.batch_status !== "draft") {
+      return { success: false, message: "Only draft journal lines can be removed." };
+    }
+    requireEntityScope(ctx, batch.entity_id);
+
+    const { error: de } = await admin.from("gl_journal_lines").delete().eq("id", v.journalLineId);
+    if (de) throw new Error(de.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: batch.entity_id,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "finance_core",
+      actionCode: "gl.journal_line.delete",
+      targetTable: "gl_journal_lines",
+      targetRecordId: v.journalLineId,
+      oldValues: { journalBatchId: batch.id },
+    });
+
+    revalidatePath("/finance/journals");
+    revalidatePath(`/finance/journals/${batch.id}`);
+
+    return { success: true, message: "Line removed." };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+const PostGlJournalBatchSchema = z.object({
+  tenantId: z.string().uuid(),
+  journalBatchId: z.string().uuid(),
+});
+
+/** Permission: journal.post */
+export async function postGlJournalBatch(
+  input: z.infer<typeof PostGlJournalBatchSchema>
+): Promise<ActionResult<void>> {
+  try {
+    const v = PostGlJournalBatchSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requirePermission(ctx, "journal.post");
+
+    const admin = createSupabaseAdminClient();
+    const { data: batch, error: be } = await admin
+      .from("gl_journal_batches")
+      .select("id, entity_id, batch_status, journal_date, fiscal_period_id")
+      .eq("id", v.journalBatchId)
+      .eq("tenant_id", v.tenantId)
+      .single();
+    if (be || !batch) return { success: false, message: "Journal batch not found." };
+    if (batch.batch_status !== "draft") return { success: false, message: "Journal is not in draft status." };
+    requireEntityScope(ctx, batch.entity_id);
+
+    if (batch.fiscal_period_id) {
+      const { data: fp, error: fe } = await admin
+        .from("fiscal_periods")
+        .select("start_date, end_date, status")
+        .eq("id", batch.fiscal_period_id)
+        .single();
+      if (fe || !fp) return { success: false, message: "Fiscal period missing." };
+      if (fp.status !== "open") return { success: false, message: "Fiscal period is not open." };
+      const jd = batch.journal_date;
+      if (jd < fp.start_date || jd > fp.end_date) {
+        return { success: false, message: "Journal date is outside the selected fiscal period." };
+      }
+    }
+
+    const { data: lines, error: le } = await admin
+      .from("gl_journal_lines")
+      .select("debit_amount, credit_amount")
+      .eq("journal_batch_id", v.journalBatchId);
+    if (le) throw new Error(le.message);
+    const arr = lines ?? [];
+    if (arr.length < 2) {
+      return { success: false, message: "At least two lines are required to post." };
+    }
+    const totalDebit = arr.reduce((s: number, r: { debit_amount?: unknown; credit_amount?: unknown }) => s + Number(r.debit_amount ?? 0), 0);
+    const totalCredit = arr.reduce((s: number, r: { debit_amount?: unknown; credit_amount?: unknown }) => s + Number(r.credit_amount ?? 0), 0);
+    if (Number(totalDebit.toFixed(2)) !== Number(totalCredit.toFixed(2)) || totalDebit <= 0) {
+      return { success: false, message: "Debits and credits must balance and be greater than zero." };
+    }
+
+    const now = new Date().toISOString();
+    const { error: ue } = await admin
+      .from("gl_journal_batches")
+      .update({
+        batch_status: "posted",
+        posted_at: now,
+        posted_by: ctx.platformUserId,
+        updated_at: now,
+      })
+      .eq("id", v.journalBatchId);
+
+    if (ue) throw new Error(ue.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: batch.entity_id,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "finance_core",
+      actionCode: "gl.journal_batch.post",
+      targetTable: "gl_journal_batches",
+      targetRecordId: v.journalBatchId,
+      newValues: { totalDebit, totalCredit },
+    });
+
+    revalidatePath("/finance/journals");
+    revalidatePath(`/finance/journals/${v.journalBatchId}`);
+
+    return { success: true, message: "Journal posted." };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+const VoidGlJournalBatchSchema = z.object({
+  tenantId: z.string().uuid(),
+  journalBatchId: z.string().uuid(),
+  voidReason: z.string().min(1).max(2000),
+});
+
+/** Permission: journal.reverse */
+export async function voidGlJournalBatch(
+  input: z.infer<typeof VoidGlJournalBatchSchema>
+): Promise<ActionResult<void>> {
+  try {
+    const v = VoidGlJournalBatchSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requirePermission(ctx, "journal.reverse");
+
+    const admin = createSupabaseAdminClient();
+    const { data: batch, error: be } = await admin
+      .from("gl_journal_batches")
+      .select("id, entity_id, batch_status")
+      .eq("id", v.journalBatchId)
+      .eq("tenant_id", v.tenantId)
+      .single();
+    if (be || !batch) return { success: false, message: "Journal batch not found." };
+    if (batch.batch_status !== "posted") return { success: false, message: "Only posted journals can be voided." };
+    requireEntityScope(ctx, batch.entity_id);
+
+    const now = new Date().toISOString();
+    const { error: ue } = await admin
+      .from("gl_journal_batches")
+      .update({
+        batch_status: "void",
+        voided_at: now,
+        void_reason: v.voidReason.trim(),
+        updated_at: now,
+      })
+      .eq("id", v.journalBatchId);
+
+    if (ue) throw new Error(ue.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: batch.entity_id,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "finance_core",
+      actionCode: "gl.journal_batch.void",
+      targetTable: "gl_journal_batches",
+      targetRecordId: v.journalBatchId,
+      newValues: { voidReason: v.voidReason.trim() },
+    });
+
+    revalidatePath("/finance/journals");
+    revalidatePath(`/finance/journals/${v.journalBatchId}`);
+
+    return { success: true, message: "Journal voided." };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+// ── Pack 017 — GL account bindings for subledger automation ───────────────────
+
+const UpsertGlBindingSchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid(),
+  bindingKey: z.enum([
+    "ar_receivable",
+    "ar_revenue",
+    "ar_cash_clearing",
+    "payroll_expense",
+    "payroll_liability",
+    "ap_payable",
+    "ap_expense",
+    "ap_cash_clearing",
+  ]),
+  accountId: z.string().uuid(),
+});
+
+/** Permission: gl.binding.manage */
+export async function upsertEntityGlAccountBinding(
+  input: z.infer<typeof UpsertGlBindingSchema>
+): Promise<ActionResult<{ bindingId: string }>> {
+  try {
+    const v = UpsertGlBindingSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requirePermission(ctx, "gl.binding.manage");
+    requireEntityScope(ctx, v.entityId);
+
+    const admin = createSupabaseAdminClient();
+    const { data: acct, error: ae } = await admin
+      .from("accounts")
+      .select("id, entity_id, allow_posting, is_active")
+      .eq("id", v.accountId)
+      .eq("tenant_id", v.tenantId)
+      .single();
+    if (ae || !acct || acct.entity_id !== v.entityId) {
+      return { success: false, message: "Account not found on this entity." };
+    }
+    if (!acct.allow_posting || !acct.is_active) {
+      return { success: false, message: "Account must be active and allow posting." };
+    }
+
+    const { data: row, error } = await admin
+      .from("entity_gl_account_bindings")
+      .upsert(
+        {
+          tenant_id: v.tenantId,
+          entity_id: v.entityId,
+          binding_key: v.bindingKey,
+          account_id: v.accountId,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "tenant_id,entity_id,binding_key" }
+      )
+      .select("id")
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: v.entityId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "finance_core",
+      actionCode: "gl.binding.upsert",
+      targetTable: "entity_gl_account_bindings",
+      targetRecordId: row.id,
+      newValues: { bindingKey: v.bindingKey, accountId: v.accountId },
+    });
+
+    revalidatePath("/finance/gl/posting-bindings");
+
+    return { success: true, message: "GL binding saved.", data: { bindingId: row.id } };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+/**
+ * Use with `<form action={submitCreateAccountForm}>` — must be a module-level export
+ * from this `"use server"` file (not an inline closure) so the action can sit beside
+ * Client Components on the same page.
+ */
+export async function submitCreateAccountForm(formData: FormData): Promise<void> {
+  await createAccount(formData);
+}
+
+/** @see submitCreateAccountForm */
+export async function submitCreateFiscalPeriodForm(formData: FormData): Promise<void> {
+  await createFiscalPeriod(formData);
 }

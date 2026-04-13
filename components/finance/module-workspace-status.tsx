@@ -3,12 +3,27 @@ import { WATCHMAN_DEPLOYED_MIGRATION_PACK } from "@/lib/constants/watchman-migra
 export function ModuleWorkspaceStatus({
   packNumber,
   workspaceName,
+  workflowConnected = false,
 }: {
   packNumber: number;
   workspaceName: string;
+  /** When true, schema is live and this route already lists/forms/actions (e.g. GL). */
+  workflowConnected?: boolean;
 }) {
   const schemaReady = packNumber <= WATCHMAN_DEPLOYED_MIGRATION_PACK;
   const packLabel = `Pack ${String(packNumber).padStart(3, "0")}`;
+
+  if (schemaReady && workflowConnected) {
+    return (
+      <div className="wf-card border-emerald-500/25 bg-emerald-950/30">
+        <p className="text-sm text-emerald-400 font-medium mb-2">Workspace connected</p>
+        <p className="text-sm text-neutral-300 leading-relaxed">
+          <span className="text-neutral-100 font-medium">{workspaceName}</span> ({packLabel}) — this page
+          loads live data and uses server actions for the workflows below.
+        </p>
+      </div>
+    );
+  }
 
   if (schemaReady) {
     return (

@@ -6,6 +6,7 @@ import { resolveRequestContext } from "@/lib/context/resolve-request-context";
 import { requirePermission, requireEntityScope, requireModuleEntitlement } from "@/lib/permissions/require-permission";
 import { writeAuditLog } from "@/lib/audit/write-audit-log";
 import { mapErrorToResult, type ActionResult } from "@/lib/errors/app-error";
+import { tryPostPayrollFinalizeReversalGl, tryPostPayrollFinalizeToGl } from "@/modules/finance-core/lib/subledger-gl-post";
 import { z } from "zod";
 
 function roundMoney(n: number): number {
@@ -824,7 +825,7 @@ export async function finalizePayrollRun(input: {
 
     const { data: run, error: re } = await admin
       .from("payroll_runs")
-      .select("run_status")
+      .select("run_status, run_number, pay_date")
       .eq("id", input.payrollRunId)
       .eq("tenant_id", input.tenantId)
       .eq("entity_id", input.entityId)
@@ -904,10 +905,120 @@ export async function finalizePayrollRun(input: {
       metadata: { statementsGenerated },
     });
 
+    const totalGross = ((items ?? []) as { gross_pay: string | number }[]).reduce(
+      (s, r) => s + Number(r.gross_pay ?? 0),
+      0
+    );
+    const journalDate =
+      run.pay_date != null ? String(run.pay_date).slice(0, 10) : new Date().toISOString().slice(0, 10);
+    try {
+      await tryPostPayrollFinalizeToGl(admin, ctx, {
+        tenantId: input.tenantId,
+        entityId: input.entityId,
+        payrollRunId: input.payrollRunId,
+        journalDate,
+        runNumber: run.run_number ?? null,
+        totalGross,
+      });
+    } catch {
+      /* best-effort GL when Pack 017 bindings exist */
+    }
+
     return {
       success: true,
       message: "Payroll run finalized.",
       data: { payrollRunId: input.payrollRunId, statementsGenerated },
+    };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+/** Permission: payroll.run.reverse — reverses status to `reversed` and posts GL reversal of gross accrual when present. */
+export async function reversePayrollRun(input: {
+  tenantId: string;
+  entityId: string;
+  payrollRunId: string;
+  reason: string;
+}): Promise<ActionResult<void>> {
+  try {
+    if (!input.reason?.trim()) {
+      return { success: false, message: "A reversal reason is required." };
+    }
+    const ctx = await resolveRequestContext(input.tenantId);
+    requireModuleEntitlement(ctx, "payroll");
+    requirePermission(ctx, "payroll.run.reverse");
+    requireEntityScope(ctx, input.entityId);
+
+    const admin = createSupabaseAdminClient();
+    const { data: run, error: re } = await admin
+      .from("payroll_runs")
+      .select("run_status, run_number, pay_date")
+      .eq("id", input.payrollRunId)
+      .eq("tenant_id", input.tenantId)
+      .eq("entity_id", input.entityId)
+      .single();
+
+    if (re || !run) return { success: false, message: "Payroll run not found." };
+    if (run.run_status !== "finalized") {
+      return {
+        success: false,
+        message: `Only finalized runs can be reversed. Current status: ${run.run_status}.`,
+      };
+    }
+
+    const now = new Date().toISOString();
+    const { error: ue } = await admin
+      .from("payroll_runs")
+      .update({
+        run_status: "reversed",
+        reversed_by: ctx.platformUserId,
+        reversed_at: now,
+        reversal_reason: input.reason.trim(),
+        updated_at: now,
+      })
+      .eq("id", input.payrollRunId);
+
+    if (ue) throw new Error(ue.message);
+
+    await admin.from("payroll_approval_logs").insert({
+      tenant_id: input.tenantId,
+      entity_id: input.entityId,
+      payroll_run_id: input.payrollRunId,
+      action_code: "reversed",
+      actor_platform_user_id: ctx.platformUserId,
+      action_notes: input.reason.trim(),
+    });
+
+    await writeAuditLog({
+      tenantId: input.tenantId,
+      entityId: input.entityId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "payroll",
+      actionCode: "payroll.run.reverse",
+      targetTable: "payroll_runs",
+      targetRecordId: input.payrollRunId,
+      newValues: { runStatus: "reversed", reason: input.reason.trim() },
+    });
+
+    const journalDate =
+      run.pay_date != null ? String(run.pay_date).slice(0, 10) : new Date().toISOString().slice(0, 10);
+    try {
+      await tryPostPayrollFinalizeReversalGl(admin, ctx, {
+        tenantId: input.tenantId,
+        entityId: input.entityId,
+        payrollRunId: input.payrollRunId,
+        journalDate,
+        runNumber: run.run_number ?? null,
+      });
+    } catch {
+      /* best-effort GL reversal when a finalize posting exists */
+    }
+
+    return {
+      success: true,
+      message:
+        "Payroll run reversed in the ledger workflow. Pay statements from this run are unchanged; review stubs and liabilities manually if needed.",
     };
   } catch (err) {
     return mapErrorToResult(err);

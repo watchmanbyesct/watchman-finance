@@ -4,60 +4,104 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { WATCHMAN_DEPLOYED_MIGRATION_PACK } from "@/lib/constants/watchman-migrations";
+import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
+import { getFinanceDashboardMetrics, type FinanceDashboardMetrics } from "@/lib/finance/read-queries";
 
 export const metadata = { title: "Dashboard — Watchman Finance" };
 
 const PACK = WATCHMAN_DEPLOYED_MIGRATION_PACK;
 
-// Placeholder stat cards — replace with live queries when reporting is wired
-const STATS = [
+function formatUsd(n: number) {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(n);
+}
+
+const FALLBACK_STATS = [
   {
     label: "AR Balance",
     value: "$0.00",
-    change: null,
-    trend: null,
-    note: "Awaiting AR data",
+    note: "Sign in with workspace to load live AR",
     href: "/finance/ar/invoices",
   },
   {
     label: "AP Balance",
     value: "$0.00",
-    change: null,
-    trend: null,
-    note: "Awaiting AP data",
+    note: "Sign in with workspace to load live AP",
     href: "/finance/ap/bills",
   },
   {
-    label: "Open Invoices",
-    value: "0",
-    change: null,
-    trend: null,
-    note: "No open invoices",
+    label: "Open invoices",
+    value: "—",
+    note: "Entity-scoped issued / partial",
     href: "/finance/ar/invoices",
   },
   {
-    label: "Payroll — Next Run",
-    value: "Not Configured",
-    change: null,
-    trend: null,
-    note: "Set up a pay group",
-    href: "/finance/payroll/profiles",
+    label: "Payroll",
+    value: "—",
+    note: "Pay groups & draft runs",
+    href: "/finance/payroll/runs",
   },
 ];
 
+function statsFromMetrics(m: FinanceDashboardMetrics) {
+  const payrollValue =
+    m.payGroupCount === 0
+      ? "No pay groups"
+      : m.draftPayrollRunLabel ?? "No draft runs";
+  const payrollNote =
+    m.payGroupCount === 0 ? "Create a pay group to run payroll" : `${m.payGroupCount} pay group(s)`;
+
+  return [
+    {
+      label: "AR balance (open)",
+      value: formatUsd(m.arBalanceDue),
+      note: `${m.openInvoiceCount} open invoice(s)`,
+      href: "/finance/ar/invoices",
+    },
+    {
+      label: "AP balance (open)",
+      value: formatUsd(m.apBalanceDue),
+      note: `${m.openBillCount} open bill(s)`,
+      href: "/finance/ap/bills",
+    },
+    {
+      label: "Open invoices",
+      value: String(m.openInvoiceCount),
+      note: "Issued or partially paid",
+      href: "/finance/ar/invoices",
+    },
+    {
+      label: "Payroll — next focus",
+      value: payrollValue,
+      note: payrollNote,
+      href: "/finance/payroll/runs",
+    },
+  ];
+}
+
 const SETUP_CHECKLIST = [
   { label: "Pack 001 — Foundation (GL, org, audit)", complete: PACK >= 1, href: null },
-  { label: "Pack 002 — Integration staging", complete: PACK >= 2, href: null },
-  { label: "Pack 003 — AR & AP core", complete: PACK >= 3, href: null },
-  { label: "Pack 004 — Payroll core", complete: PACK >= 4, href: null },
-  { label: "Pack 005 — Leave & accruals", complete: PACK >= 5, href: null },
-  { label: "Pack 006 — Banking & reconciliation", complete: PACK >= 6, href: null },
-  { label: "Pack 007 — Catalog & billing", complete: PACK >= 7, href: null },
-  { label: "Pack 008 — Inventory & assets", complete: PACK >= 8, href: null },
-  { label: "Pack 009 — Reporting & close", complete: PACK >= 9, href: null },
-  { label: "Pack 010 — Budgeting & forecasting", complete: PACK >= 10, href: null },
-  { label: "Pack 011 — Consolidation & commercial", complete: PACK >= 11, href: null },
-  { label: "Pack 012 — Hardening & QA", complete: PACK >= 12, href: null },
+  { label: "Pack 002 — Integration staging", complete: PACK >= 2, href: "/finance/integration" },
+  { label: "Pack 003 — AR & AP core", complete: PACK >= 3, href: "/finance/ar-ap" },
+  { label: "Pack 004 — Payroll core", complete: PACK >= 4, href: "/finance/payroll" },
+  { label: "Pack 005 — Leave & accruals", complete: PACK >= 5, href: "/finance/leave" },
+  { label: "Pack 006 — Banking & reconciliation", complete: PACK >= 6, href: "/finance/banking" },
+  { label: "Pack 007 — Catalog & billing", complete: PACK >= 7, href: "/finance/catalog-billing" },
+  { label: "Pack 008 — Inventory & assets", complete: PACK >= 8, href: "/finance/inventory-assets" },
+  { label: "Pack 009 — Reporting & close", complete: PACK >= 9, href: "/finance/reporting-hub" },
+  { label: "Pack 010 — Budgeting & forecasting", complete: PACK >= 10, href: "/finance/planning-hub" },
+  { label: "Pack 011 — Consolidation & commercial", complete: PACK >= 11, href: "/finance/consolidation-commercial-hub" },
+  { label: "Pack 012 — Hardening & QA", complete: PACK >= 12, href: "/finance/operations-hub" },
+  { label: "Pack 013 — Module permissions (007–012 surfaces)", complete: PACK >= 13, href: "/finance/pack-013" },
+  { label: "Pack 014 — Tax, AR statements/collections, AP recurring", complete: PACK >= 14, href: "/finance/tax" },
+  { label: "Pack 015 — Extension permissions (tax, collections, recurring)", complete: PACK >= 15, href: "/finance/pack-015" },
+  { label: "Pack 016 — GL journal posting (manual batches)", complete: PACK >= 16, href: "/finance/journals" },
+  { label: "Pack 017 — Subledger→GL, integration pipeline ops, reporting automation", complete: PACK >= 17, href: "/finance/gl/posting-bindings" },
+  { label: "Pack 018 — GL reversals, AP→GL, payroll.reverse", complete: PACK >= 18, href: "/finance/gl/posting-bindings" },
+  {
+    label: "Packs 019–022 + 023 — Evidence, approvals, TB snapshots, API/webhook diagnostics & permissions",
+    complete: PACK >= 23,
+    href: "/finance/evidence",
+  },
   { label: "EST Holdings tenant created", complete: false, href: null },
   { label: "ESCT entity created", complete: false, href: null },
   { label: "Chart of accounts seeded", complete: false, href: "/finance/accounts" },
@@ -84,9 +128,18 @@ const MODULE_SCHEMA_STATUS: { name: string; ready: boolean }[] = [
   { name: "Budgeting & forecasting", ready: PACK >= 10 },
   { name: "Consolidation", ready: PACK >= 11 },
   { name: "Operations & QA", ready: PACK >= 12 },
+  { name: "Pack 013 — Granular module permissions", ready: PACK >= 13 },
+  { name: "Tax & statutory (shells)", ready: PACK >= 14 },
+  { name: "GL journal posting", ready: PACK >= 16 },
+  { name: "Subledger GL & reporting automation", ready: PACK >= 17 },
+  { name: "GL reversals & AP subledger", ready: PACK >= 18 },
+  { name: "Evidence, approvals, TB cache & integration diagnostics", ready: PACK >= 23 },
 ];
 
 const QUICK_LINKS = [
+  ...(PACK >= 16
+    ? [{ label: "GL journal", href: "/finance/journals", icon: FileText } as const]
+    : []),
   { label: "Create Invoice",     href: "/finance/ar/invoices",          icon: FileText },
   { label: "Enter Bill",         href: "/finance/ap/bills",             icon: FileText },
   { label: "Run Payroll",        href: "/finance/payroll/runs",         icon: DollarSign },
@@ -95,7 +148,18 @@ const QUICK_LINKS = [
   { label: "Manage Employees",   href: "/finance/payroll/profiles",     icon: Users },
 ];
 
-export default function FinanceDashboardPage() {
+export default async function FinanceDashboardPage() {
+  const workspace = await resolveFinanceWorkspace();
+  let metrics: FinanceDashboardMetrics | null = null;
+  if (workspace) {
+    try {
+      metrics = await getFinanceDashboardMetrics(workspace.tenantId, workspace.entityId);
+    } catch {
+      metrics = null;
+    }
+  }
+
+  const stats = metrics ? statsFromMetrics(metrics) : FALLBACK_STATS;
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
@@ -119,9 +183,9 @@ export default function FinanceDashboardPage() {
         </div>
       </div>
 
-      {/* KPI Stats */}
+      {/* KPI Stats — live when workspace + queries succeed */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {STATS.map((stat) => (
+        {stats.map((stat) => (
           <Link href={stat.href} key={stat.label} className="wf-card group hover:border-white/20 transition-colors">
             <div className="wf-stat">
               <p className="wf-stat-label">{stat.label}</p>
@@ -232,11 +296,10 @@ export default function FinanceDashboardPage() {
         <div>
           <p className="text-sm font-medium text-neutral-200">Operational next steps</p>
           <p className="text-sm text-neutral-500 mt-1">
-            SQL through Pack {packLabel} is reflected in the UI. Finish the checklist (tenant, COA, master
-            data) and connect each workspace to server actions as workflows mature. Bump{" "}
+            KPI tiles above use live invoice and bill balances when you are signed in with a finance workspace. Bump{" "}
             <code className="text-xs text-neutral-400">WATCHMAN_DEPLOYED_MIGRATION_PACK</code> in{" "}
-            <code className="text-xs text-neutral-400">lib/constants/watchman-migrations.ts</code> whenever
-            you apply additional packs so module banners stay accurate.
+            <code className="text-xs text-neutral-400">lib/constants/watchman-migrations.ts</code> whenever you apply
+            additional packs so module banners stay accurate.
           </p>
         </div>
       </div>

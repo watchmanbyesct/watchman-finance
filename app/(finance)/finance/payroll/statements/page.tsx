@@ -1,18 +1,50 @@
-import { ModuleWorkspaceStatus } from "@/components/finance/module-workspace-status";
+import { WorkflowPageFrame } from "@/components/finance/workflow-page-frame";
+import { WorkflowDataTable } from "@/components/finance/workflow-data-table";
+import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
+import { listPayStatementsForEntity } from "@/lib/finance/read-queries";
 
-export const metadata = { title: "Pay Statements — Watchman Finance" };
+export const metadata = { title: "Pay statements — Watchman Finance" };
 
-export default function Page() {
+export default async function Page() {
+  const workspace = await resolveFinanceWorkspace();
+  let rows: Record<string, unknown>[] = [];
+  let loadError: string | null = null;
+
+  if (workspace) {
+    try {
+      rows = (await listPayStatementsForEntity(workspace.tenantId, workspace.entityId)) as Record<string, unknown>[];
+    } catch (e) {
+      loadError = e instanceof Error ? e.message : "Failed to load pay statements.";
+    }
+  }
+
   return (
-    <div className="max-w-5xl space-y-6">
-      <div>
-        <h1 className="wf-page-title">Pay Statements</h1>
-        <p className="text-sm text-neutral-500 mt-1">
-          Module: Payroll &mdash; Pack 004
-        </p>
-      </div>
-      <ModuleWorkspaceStatus packNumber={4} workspaceName="Payroll" />
-
-    </div>
+    <WorkflowPageFrame
+      title="Pay statements"
+      moduleLine="Module: Payroll — Pack 004"
+      packNumber={4}
+      workspaceName="Payroll"
+      workspace={workspace}
+      loadError={loadError}
+    >
+      {workspace && !loadError && (
+        <div>
+          <p className="text-sm text-neutral-500 mb-4">
+            Statements are generated when payroll runs are finalized. This list is read-only here.
+          </p>
+          <h2 className="text-sm font-medium text-neutral-300 mb-3">Statements</h2>
+          <WorkflowDataTable
+            columns={[
+              { key: "statement_date", label: "Statement date" },
+              { key: "statement_status", label: "Status" },
+              { key: "gross_pay", label: "Gross" },
+              { key: "net_pay", label: "Net" },
+              { key: "finance_person_id", label: "Person id" },
+            ]}
+            rows={rows}
+          />
+        </div>
+      )}
+    </WorkflowPageFrame>
   );
 }

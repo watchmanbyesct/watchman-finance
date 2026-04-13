@@ -1,11 +1,9 @@
-import { redirect } from "next/navigation";
-import { getAuthSession } from "@/lib/auth/resolve-session";
+import { HomeRedirectClient } from "./home-redirect-client";
 
-export default async function RootPage() {
-  const session = await getAuthSession();
-  if (session) {
-    redirect("/finance/dashboard");
-  } else {
-    redirect("/login");
-  }
+/**
+ * `/` is protected by middleware. Authenticated users land here briefly, then route to the dashboard.
+ * Unauthenticated users are redirected to `/login` by middleware before this tree runs.
+ */
+export default function RootPage() {
+  return <HomeRedirectClient />;
 }

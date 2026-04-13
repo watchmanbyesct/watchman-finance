@@ -91,6 +91,7 @@ function rowToAccount(row: any): Account {
     accountCategoryId: row.account_category_id,
     code:              row.code,
     name:              row.name,
+    description:       row.description ?? null,
     accountType:       row.account_type,
     normalBalance:     row.normal_balance,
     allowPosting:      row.allow_posting,

@@ -1,18 +1,51 @@
-import { ModuleWorkspaceStatus } from "@/components/finance/module-workspace-status";
+import { WorkflowPageFrame } from "@/components/finance/workflow-page-frame";
+import { WorkflowDataTable } from "@/components/finance/workflow-data-table";
+import { BillableCandidateForm } from "@/components/finance/connected/catalog-billing-inventory-forms";
+import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
+import { listBillableCandidatesForTenant } from "@/lib/finance/read-queries";
 
-export const metadata = { title: "Billing Candidates — Watchman Finance" };
+export const metadata = { title: "Billable candidates — Watchman Finance" };
 
-export default function Page() {
+export default async function Page() {
+  const workspace = await resolveFinanceWorkspace();
+  let rows: Record<string, unknown>[] = [];
+  let loadError: string | null = null;
+
+  if (workspace) {
+    try {
+      rows = (await listBillableCandidatesForTenant(workspace.tenantId)) as Record<string, unknown>[];
+    } catch (e) {
+      loadError = e instanceof Error ? e.message : "Failed to load candidates.";
+    }
+  }
+
   return (
-    <div className="max-w-5xl space-y-6">
-      <div>
-        <h1 className="wf-page-title">Billing Candidates</h1>
-        <p className="text-sm text-neutral-500 mt-1">
-          Module: Billing &mdash; Pack 007
-        </p>
-      </div>
-      <ModuleWorkspaceStatus packNumber={7} workspaceName="Billing" />
-
-    </div>
+    <WorkflowPageFrame
+      title="Billable event candidates"
+      moduleLine="Module: Billing — Pack 007"
+      packNumber={7}
+      workspaceName="Billing"
+      workspace={workspace}
+      loadError={loadError}
+    >
+      {workspace && !loadError && (
+        <>
+          <BillableCandidateForm workspace={workspace} />
+          <div>
+            <h2 className="text-sm font-medium text-neutral-300 mb-3">Candidates</h2>
+            <WorkflowDataTable
+              columns={[
+                { key: "source_table", label: "Source" },
+                { key: "source_record_id", label: "Record" },
+                { key: "candidate_status", label: "Status" },
+                { key: "candidate_date", label: "Date" },
+                { key: "quantity", label: "Qty" },
+              ]}
+              rows={rows}
+            />
+          </div>
+        </>
+      )}
+    </WorkflowPageFrame>
   );
 }

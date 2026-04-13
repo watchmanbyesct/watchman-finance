@@ -1,5 +1,6 @@
 "use server";
 
+import { createHash, randomUUID } from "crypto";
 import { z } from "zod";
 import { createSupabaseAdminClient } from "@/lib/db/supabase-server";
 import { resolveRequestContext } from "@/lib/context/resolve-request-context";
@@ -157,6 +158,223 @@ export async function promoteStagedEmployee(
       message: "Employee promoted to finance_people.",
       data: { financePersonId },
     };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+const StageManualEmployeeSchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid().optional(),
+  sourceRecordId: z.string().min(1).max(255),
+  legalFirstName: z.string().min(1),
+  legalLastName: z.string().min(1),
+  email: z.string().email().optional(),
+});
+
+/**
+ * Stage an employee payload (same shape as Launch integration), for manual testing or corrections.
+ * Permission: integration.staging.promote
+ */
+export async function stageManualStagedEmployee(
+  input: z.infer<typeof StageManualEmployeeSchema>
+): Promise<ActionResult<{ stagedEmployeeId: string }>> {
+  try {
+    const v = StageManualEmployeeSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requirePermission(ctx, "integration.staging.promote");
+    if (v.entityId) requireEntityScope(ctx, v.entityId);
+
+    const employee = {
+      legal_first_name: v.legalFirstName,
+      legal_last_name: v.legalLastName,
+      email: v.email ?? undefined,
+      employment_status: "active",
+    };
+
+    const dedupeKey = createHash("sha256")
+      .update(`watchman_launch:employee:${v.sourceRecordId}:${JSON.stringify(employee)}`)
+      .digest("hex");
+
+    const admin = createSupabaseAdminClient();
+    const { data, error } = await admin
+      .from("staged_employees")
+      .upsert(
+        {
+          tenant_id: v.tenantId,
+          entity_id: v.entityId ?? null,
+          source_system_key: "watchman_launch",
+          source_record_id: v.sourceRecordId,
+          dedupe_key: dedupeKey,
+          payload_json: employee,
+          normalized_json: {},
+          validation_status: "pending",
+          correlation_id: randomUUID(),
+        },
+        { onConflict: "tenant_id,dedupe_key" }
+      )
+      .select("id")
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: v.entityId ?? null,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "finance_core",
+      actionCode: "integration.stage_employee_manual",
+      targetTable: "staged_employees",
+      targetRecordId: data.id,
+      newValues: { sourceRecordId: v.sourceRecordId },
+    });
+
+    return { success: true, message: "Employee staged.", data: { stagedEmployeeId: data.id } };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+const StageManualTimeEntrySchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid().optional(),
+  sourceRecordId: z.string().min(1).max(255),
+  employeeSourceRecordId: z.string().min(1).max(255),
+  payPeriodStart: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  payPeriodEnd: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  regularHours: z.number().nonnegative().default(0),
+  overtimeHours: z.number().nonnegative().default(0),
+});
+
+/**
+ * Stage approved-style time for payroll ingestion (mirrors Operations integration contract).
+ * Permission: integration.staging.promote
+ */
+export async function stageManualStagedTimeEntry(
+  input: z.infer<typeof StageManualTimeEntrySchema>
+): Promise<ActionResult<{ stagedTimeEntryId: string }>> {
+  try {
+    const v = StageManualTimeEntrySchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requirePermission(ctx, "integration.staging.promote");
+    if (v.entityId) requireEntityScope(ctx, v.entityId);
+
+    const timeEntry = {
+      employee_source_record_id: v.employeeSourceRecordId,
+      regular_hours: v.regularHours,
+      overtime_hours: v.overtimeHours,
+    };
+
+    const dedupeKey = createHash("sha256")
+      .update(`watchman_operations:approved_time:${v.sourceRecordId}:${JSON.stringify(timeEntry)}`)
+      .digest("hex");
+
+    const admin = createSupabaseAdminClient();
+    const { data, error } = await admin
+      .from("staged_time_entries")
+      .upsert(
+        {
+          tenant_id: v.tenantId,
+          entity_id: v.entityId ?? null,
+          source_system_key: "watchman_operations",
+          source_record_id: v.sourceRecordId,
+          employee_source_record_id: v.employeeSourceRecordId,
+          pay_period_start: v.payPeriodStart ?? null,
+          pay_period_end: v.payPeriodEnd ?? null,
+          dedupe_key: dedupeKey,
+          payload_json: timeEntry,
+          normalized_json: {},
+          approval_status: "approved",
+          validation_status: "pending",
+          correlation_id: randomUUID(),
+        },
+        { onConflict: "tenant_id,dedupe_key" }
+      )
+      .select("id")
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: v.entityId ?? null,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "finance_core",
+      actionCode: "integration.stage_time_manual",
+      targetTable: "staged_time_entries",
+      targetRecordId: data.id,
+      newValues: { sourceRecordId: v.sourceRecordId },
+    });
+
+    return { success: true, message: "Time entry staged.", data: { stagedTimeEntryId: data.id } };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+const StageManualServiceEventSchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid().optional(),
+  sourceRecordId: z.string().min(1).max(255),
+  serviceType: z.string().min(1).max(120),
+  eventDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  notes: z.string().max(2000).optional(),
+});
+
+/**
+ * Stage a service event for downstream billing workflows.
+ * Permission: integration.staging.promote
+ */
+export async function stageManualStagedServiceEvent(
+  input: z.infer<typeof StageManualServiceEventSchema>
+): Promise<ActionResult<{ stagedServiceEventId: string }>> {
+  try {
+    const v = StageManualServiceEventSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requirePermission(ctx, "integration.staging.promote");
+    if (v.entityId) requireEntityScope(ctx, v.entityId);
+
+    const payload = { service_type: v.serviceType, notes: v.notes ?? null };
+    const dedupeKey = createHash("sha256")
+      .update(`watchman_operations:service_event:${v.sourceRecordId}:${JSON.stringify(payload)}`)
+      .digest("hex");
+
+    const admin = createSupabaseAdminClient();
+    const { data, error } = await admin
+      .from("staged_service_events")
+      .upsert(
+        {
+          tenant_id: v.tenantId,
+          entity_id: v.entityId ?? null,
+          source_system_key: "watchman_operations",
+          source_record_id: v.sourceRecordId,
+          dedupe_key: dedupeKey,
+          payload_json: payload,
+          normalized_json: {},
+          event_date: v.eventDate ?? null,
+          service_type: v.serviceType,
+          validation_status: "pending",
+          correlation_id: randomUUID(),
+        },
+        { onConflict: "tenant_id,dedupe_key" }
+      )
+      .select("id")
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: v.entityId ?? null,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "finance_core",
+      actionCode: "integration.stage_service_event_manual",
+      targetTable: "staged_service_events",
+      targetRecordId: data.id,
+      newValues: { sourceRecordId: v.sourceRecordId },
+    });
+
+    return { success: true, message: "Service event staged.", data: { stagedServiceEventId: data.id } };
   } catch (err) {
     return mapErrorToResult(err);
   }

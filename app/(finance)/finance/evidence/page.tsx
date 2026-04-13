@@ -1,0 +1,71 @@
+import Link from "next/link";
+import { WorkflowPageFrame } from "@/components/finance/workflow-page-frame";
+import { WorkflowDataTable } from "@/components/finance/workflow-data-table";
+import { FinanceEvidenceWorkflowForm } from "@/components/finance/connected/workflow-extensions-forms";
+import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
+import { ModuleWorkspaceStatus } from "@/components/finance/module-workspace-status";
+import { GlSetupRequired } from "@/components/finance/gl/gl-setup-required";
+import { listFinanceEvidenceDocumentsForScope } from "@/lib/finance/read-queries";
+
+export const metadata = { title: "Evidence documents — Watchman Finance" };
+
+export default async function Page() {
+  const workspace = await resolveFinanceWorkspace();
+
+  if (!workspace) {
+    return (
+      <div className="max-w-5xl space-y-6">
+        <div>
+          <h1 className="wf-page-title">Evidence documents</h1>
+          <p className="text-sm text-neutral-500 mt-1">Pack 019 — Finance evidence metadata</p>
+        </div>
+        <ModuleWorkspaceStatus packNumber={23} workspaceName="Finance evidence" />
+        <GlSetupRequired />
+      </div>
+    );
+  }
+
+  let rows: Awaited<ReturnType<typeof listFinanceEvidenceDocumentsForScope>> = [];
+  let loadError: string | null = null;
+  try {
+    rows = await listFinanceEvidenceDocumentsForScope(workspace.tenantId, workspace.entityId);
+  } catch (e) {
+    loadError = e instanceof Error ? e.message : "Failed to load evidence.";
+  }
+
+  return (
+    <WorkflowPageFrame
+      title="Evidence documents"
+      moduleLine="Pack 019 — Register storage paths and metadata for supporting documents tied to finance records."
+      packNumber={23}
+      workspaceName="Finance evidence"
+      workspace={workspace}
+      loadError={loadError}
+    >
+      <p className="text-sm text-neutral-500">
+        Upload files to your object store first, then register the bucket and path here. Related:{" "}
+        <Link href="/finance/approvals" className="text-amber-500 hover:text-amber-400">
+          Approval requests
+        </Link>
+        .
+      </p>
+
+      <FinanceEvidenceWorkflowForm workspace={workspace} />
+
+      <div>
+        <h2 className="text-sm font-medium text-neutral-300 mb-3">Registered documents</h2>
+        <WorkflowDataTable
+          columns={[
+            { key: "domain", label: "Domain" },
+            { key: "parent_table", label: "Parent" },
+            { key: "title", label: "Title" },
+            { key: "storage_object_path", label: "Object path" },
+            { key: "created_at", label: "Created" },
+          ]}
+          rows={rows as Record<string, unknown>[]}
+          emptyMessage="No evidence rows yet."
+        />
+      </div>
+    </WorkflowPageFrame>
+  );
+}

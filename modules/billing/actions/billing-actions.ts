@@ -140,3 +140,60 @@ export async function createBillableEventCandidate(
     return mapErrorToResult(err);
   }
 }
+
+const ResolveBillingExceptionSchema = z.object({
+  tenantId: z.string().uuid(),
+  exceptionId: z.string().uuid(),
+  resolutionStatus: z.enum(["resolved", "ignored"]),
+});
+
+/** Permission: billing.rule.manage */
+export async function resolveBillingException(
+  input: z.infer<typeof ResolveBillingExceptionSchema>
+): Promise<ActionResult<{ exceptionId: string }>> {
+  try {
+    const v = ResolveBillingExceptionSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requireModuleEntitlement(ctx, "billing");
+    requirePermission(ctx, "billing.rule.manage");
+
+    const admin = createSupabaseAdminClient();
+    const { data: row, error: fe } = await admin
+      .from("billing_exception_events")
+      .select("id, tenant_id, entity_id, resolution_status")
+      .eq("id", v.exceptionId)
+      .eq("tenant_id", v.tenantId)
+      .single();
+    if (fe || !row) return { success: false, message: "Exception not found." };
+    if (row.resolution_status !== "open") {
+      return { success: false, message: "Exception is already closed." };
+    }
+    if (row.entity_id) requireEntityScope(ctx, row.entity_id);
+
+    const { error } = await admin
+      .from("billing_exception_events")
+      .update({
+        resolution_status: v.resolutionStatus,
+        resolved_at: new Date().toISOString(),
+      })
+      .eq("id", v.exceptionId)
+      .eq("tenant_id", v.tenantId);
+
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: row.entity_id,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "billing",
+      actionCode: "billing.exception.resolve",
+      targetTable: "billing_exception_events",
+      targetRecordId: v.exceptionId,
+      newValues: { resolutionStatus: v.resolutionStatus },
+    });
+
+    return { success: true, message: "Exception updated.", data: { exceptionId: v.exceptionId } };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}

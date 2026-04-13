@@ -1,18 +1,51 @@
-import { ModuleWorkspaceStatus } from "@/components/finance/module-workspace-status";
+import { WorkflowPageFrame } from "@/components/finance/workflow-page-frame";
+import { WorkflowDataTable } from "@/components/finance/workflow-data-table";
+import { BankAccountCreateForm } from "@/components/finance/connected/banking-forms";
+import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
+import { listBankAccountsForEntity } from "@/lib/finance/read-queries";
 
-export const metadata = { title: "Bank Accounts — Watchman Finance" };
+export const metadata = { title: "Bank accounts — Watchman Finance" };
 
-export default function Page() {
+export default async function Page() {
+  const workspace = await resolveFinanceWorkspace();
+  let rows: Record<string, unknown>[] = [];
+  let loadError: string | null = null;
+
+  if (workspace) {
+    try {
+      rows = (await listBankAccountsForEntity(workspace.tenantId, workspace.entityId)) as Record<string, unknown>[];
+    } catch (e) {
+      loadError = e instanceof Error ? e.message : "Failed to load bank accounts.";
+    }
+  }
+
   return (
-    <div className="max-w-5xl space-y-6">
-      <div>
-        <h1 className="wf-page-title">Bank Accounts</h1>
-        <p className="text-sm text-neutral-500 mt-1">
-          Module: Banking &mdash; Pack 006
-        </p>
-      </div>
-      <ModuleWorkspaceStatus packNumber={6} workspaceName="Banking" />
-
-    </div>
+    <WorkflowPageFrame
+      title="Bank accounts"
+      moduleLine="Module: Banking — Pack 006"
+      packNumber={6}
+      workspaceName="Banking"
+      workspace={workspace}
+      loadError={loadError}
+    >
+      {workspace && !loadError && (
+        <>
+          <BankAccountCreateForm workspace={workspace} />
+          <div>
+            <h2 className="text-sm font-medium text-neutral-300 mb-3">Accounts</h2>
+            <WorkflowDataTable
+              columns={[
+                { key: "bank_name", label: "Bank" },
+                { key: "account_name", label: "Account" },
+                { key: "account_type", label: "Type" },
+                { key: "currency_code", label: "CCY" },
+                { key: "is_active", label: "Active" },
+              ]}
+              rows={rows}
+            />
+          </div>
+        </>
+      )}
+    </WorkflowPageFrame>
   );
 }

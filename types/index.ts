@@ -82,6 +82,7 @@ export interface Account {
   accountCategoryId: UUID;
   code: string;
   name: string;
+  description?: string | null;
   accountType: string;
   normalBalance: "debit" | "credit";
   allowPosting: boolean;

@@ -1,18 +1,55 @@
-import { ModuleWorkspaceStatus } from "@/components/finance/module-workspace-status";
+import { WorkflowPageFrame } from "@/components/finance/workflow-page-frame";
+import { WorkflowDataTable } from "@/components/finance/workflow-data-table";
+import { CloseChecklistForm } from "@/components/finance/connected/reporting-planning-consolidation-ops-forms";
+import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
+import { listCloseChecklistsForEntity } from "@/lib/finance/read-queries";
 
-export const metadata = { title: "Close Mgmt — Watchman Finance" };
+export const metadata = { title: "Period close — Watchman Finance" };
 
-export default function Page() {
+export default async function Page() {
+  const workspace = await resolveFinanceWorkspace();
+  let rows: Record<string, unknown>[] = [];
+  let loadError: string | null = null;
+
+  if (workspace) {
+    try {
+      rows = (await listCloseChecklistsForEntity(workspace.tenantId, workspace.entityId)) as Record<
+        string,
+        unknown
+      >[];
+    } catch (e) {
+      loadError = e instanceof Error ? e.message : "Failed to load close checklists.";
+    }
+  }
+
   return (
-    <div className="max-w-5xl space-y-6">
-      <div>
-        <h1 className="wf-page-title">Close Mgmt</h1>
-        <p className="text-sm text-neutral-500 mt-1">
-          Module: Reporting &mdash; Pack 009
-        </p>
-      </div>
-      <ModuleWorkspaceStatus packNumber={9} workspaceName="Reporting" />
-
-    </div>
+    <WorkflowPageFrame
+      title="Close checklists"
+      moduleLine="Module: Reporting — Pack 009"
+      packNumber={9}
+      workspaceName="Reporting"
+      workspace={workspace}
+      loadError={loadError}
+    >
+      {workspace && !loadError && (
+        <div className="space-y-6">
+          <CloseChecklistForm workspace={workspace} />
+          <div>
+          <p className="text-sm text-neutral-500 mb-4">
+            Entity-scoped checklists below. Close task rows and status transitions can extend this workflow later.
+          </p>
+          <WorkflowDataTable
+            columns={[
+              { key: "checklist_name", label: "Name" },
+              { key: "checklist_status", label: "Status" },
+              { key: "close_period_start", label: "Period start" },
+              { key: "close_period_end", label: "Period end" },
+            ]}
+            rows={rows}
+          />
+          </div>
+        </div>
+      )}
+    </WorkflowPageFrame>
   );
 }

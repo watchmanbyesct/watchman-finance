@@ -1,18 +1,64 @@
-import { ModuleWorkspaceStatus } from "@/components/finance/module-workspace-status";
+import { WorkflowPageFrame } from "@/components/finance/workflow-page-frame";
+import { WorkflowDataTable } from "@/components/finance/workflow-data-table";
+import { EmployeePayProfileForm } from "@/components/finance/connected/payroll-forms";
+import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
+import {
+  listEmployeePayProfilesForEntity,
+  listFinancePeopleForTenant,
+  listPayGroupsForEntity,
+} from "@/lib/finance/read-queries";
 
-export const metadata = { title: "Employee Pay Profiles — Watchman Finance" };
+export const metadata = { title: "Pay profiles — Watchman Finance" };
 
-export default function Page() {
+export default async function Page() {
+  const workspace = await resolveFinanceWorkspace();
+  let rows: Record<string, unknown>[] = [];
+  let people: { id: string; legal_first_name: string; legal_last_name: string }[] = [];
+  let groups: { id: string; group_code: string; group_name: string }[] = [];
+  let loadError: string | null = null;
+
+  if (workspace) {
+    try {
+      const [prof, ppl, grp] = await Promise.all([
+        listEmployeePayProfilesForEntity(workspace.tenantId, workspace.entityId),
+        listFinancePeopleForTenant(workspace.tenantId),
+        listPayGroupsForEntity(workspace.tenantId, workspace.entityId),
+      ]);
+      rows = prof as Record<string, unknown>[];
+      people = ppl as typeof people;
+      groups = grp as typeof groups;
+    } catch (e) {
+      loadError = e instanceof Error ? e.message : "Failed to load pay profiles.";
+    }
+  }
+
   return (
-    <div className="max-w-5xl space-y-6">
-      <div>
-        <h1 className="wf-page-title">Employee Pay Profiles</h1>
-        <p className="text-sm text-neutral-500 mt-1">
-          Module: Payroll &mdash; Pack 004
-        </p>
-      </div>
-      <ModuleWorkspaceStatus packNumber={4} workspaceName="Payroll" />
-
-    </div>
+    <WorkflowPageFrame
+      title="Employee pay profiles"
+      moduleLine="Module: Payroll — Pack 004"
+      packNumber={4}
+      workspaceName="Payroll"
+      workspace={workspace}
+      loadError={loadError}
+    >
+      {workspace && !loadError && (
+        <>
+          <EmployeePayProfileForm workspace={workspace} people={people} payGroups={groups} />
+          <div>
+            <h2 className="text-sm font-medium text-neutral-300 mb-3">Profiles</h2>
+            <WorkflowDataTable
+              columns={[
+                { key: "employee_number", label: "Employee #" },
+                { key: "pay_type", label: "Pay type" },
+                { key: "base_rate", label: "Base rate" },
+                { key: "annual_salary", label: "Annual" },
+                { key: "finance_person_id", label: "Person id" },
+              ]}
+              rows={rows}
+            />
+          </div>
+        </>
+      )}
+    </WorkflowPageFrame>
   );
 }

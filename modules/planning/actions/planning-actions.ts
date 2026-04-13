@@ -264,3 +264,107 @@ export async function createForecastLine(
     return mapErrorToResult(err);
   }
 }
+
+const CreateVarianceSnapshotSchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid(),
+  snapshotDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  comparisonType: z.enum(["budget_vs_actual", "forecast_vs_actual", "budget_vs_forecast"]),
+  budgetVersionId: z.string().uuid().optional(),
+  forecastVersionId: z.string().uuid().optional(),
+});
+
+/**
+ * Records a variance snapshot shell (empty JSON until analytics populate it).
+ * Permissions: budget paths require planning.budget.manage; forecast_vs_actual requires planning.forecast.manage;
+ * budget_vs_forecast requires both.
+ */
+export async function createVarianceSnapshot(
+  input: z.infer<typeof CreateVarianceSnapshotSchema>
+): Promise<ActionResult<{ varianceSnapshotId: string }>> {
+  try {
+    const v = CreateVarianceSnapshotSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requireModuleEntitlement(ctx, "planning");
+    requireEntityScope(ctx, v.entityId);
+
+    if (v.comparisonType === "budget_vs_actual") {
+      requirePermission(ctx, "planning.budget.manage");
+      if (!v.budgetVersionId) return { success: false, message: "Budget version is required for this comparison." };
+    } else if (v.comparisonType === "forecast_vs_actual") {
+      requirePermission(ctx, "planning.forecast.manage");
+      if (!v.forecastVersionId) {
+        return { success: false, message: "Forecast version is required for this comparison." };
+      }
+    } else {
+      requirePermission(ctx, "planning.budget.manage");
+      requirePermission(ctx, "planning.forecast.manage");
+      if (!v.budgetVersionId || !v.forecastVersionId) {
+        return { success: false, message: "Both budget and forecast versions are required for budget vs forecast." };
+      }
+    }
+
+    const admin = createSupabaseAdminClient();
+
+    if (v.budgetVersionId) {
+      const { data: bv, error: be } = await admin
+        .from("budget_versions")
+        .select("id, entity_id")
+        .eq("id", v.budgetVersionId)
+        .eq("tenant_id", v.tenantId)
+        .single();
+      if (be || !bv || bv.entity_id !== v.entityId) {
+        return { success: false, message: "Budget version not found for this entity." };
+      }
+    }
+
+    if (v.forecastVersionId) {
+      const { data: fv, error: fe } = await admin
+        .from("forecast_versions")
+        .select("id, entity_id")
+        .eq("id", v.forecastVersionId)
+        .eq("tenant_id", v.tenantId)
+        .single();
+      if (fe || !fv || fv.entity_id !== v.entityId) {
+        return { success: false, message: "Forecast version not found for this entity." };
+      }
+    }
+
+    const budgetIdForRow =
+      v.comparisonType === "forecast_vs_actual" ? null : (v.budgetVersionId ?? null);
+    const forecastIdForRow =
+      v.comparisonType === "budget_vs_actual" ? null : (v.forecastVersionId ?? null);
+
+    const { data: row, error } = await admin
+      .from("variance_snapshots")
+      .insert({
+        tenant_id: v.tenantId,
+        entity_id: v.entityId,
+        snapshot_date: v.snapshotDate,
+        comparison_type: v.comparisonType,
+        budget_version_id: budgetIdForRow,
+        forecast_version_id: forecastIdForRow,
+        snapshot_json: {},
+        generated_by: ctx.platformUserId,
+      })
+      .select("id")
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: v.entityId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "planning",
+      actionCode: "planning.variance_snapshot.create",
+      targetTable: "variance_snapshots",
+      targetRecordId: row.id,
+      newValues: { comparisonType: v.comparisonType, snapshotDate: v.snapshotDate },
+    });
+
+    return { success: true, message: "Variance snapshot recorded.", data: { varianceSnapshotId: row.id } };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}

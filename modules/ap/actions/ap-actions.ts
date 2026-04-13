@@ -5,6 +5,7 @@ import { resolveRequestContext } from "@/lib/context/resolve-request-context";
 import { requirePermission, requireEntityScope, requireModuleEntitlement } from "@/lib/permissions/require-permission";
 import { writeAuditLog } from "@/lib/audit/write-audit-log";
 import { mapErrorToResult, type ActionResult } from "@/lib/errors/app-error";
+import { tryPostApBillApproveToGl, tryPostApVendorPaymentToGl } from "@/modules/finance-core/lib/subledger-gl-post";
 import { z } from "zod";
 
 async function refreshBillTotals(admin: ReturnType<typeof createSupabaseAdminClient>, billId: string) {
@@ -282,7 +283,7 @@ export async function approveBill(input: {
 
     const { data: bill, error: fe } = await admin
       .from("bills")
-      .select("bill_status, bill_number")
+      .select("bill_status, bill_number, total_amount, bill_date")
       .eq("id", input.billId)
       .eq("tenant_id", input.tenantId)
       .eq("entity_id", input.entityId)
@@ -314,6 +315,19 @@ export async function approveBill(input: {
       targetRecordId: input.billId,
       newValues: { billNumber: bill.bill_number },
     });
+
+    try {
+      await tryPostApBillApproveToGl(admin, ctx, {
+        tenantId: input.tenantId,
+        entityId: input.entityId,
+        billId: input.billId,
+        billDate: bill.bill_date as string | null,
+        billNumber: bill.bill_number as string,
+        totalAmount: Number(bill.total_amount),
+      });
+    } catch {
+      /* best-effort AP→GL when Pack 018 bindings exist */
+    }
 
     return { success: true, message: `Bill ${bill.bill_number} approved.` };
   } catch (err) {
@@ -351,7 +365,7 @@ export async function recordVendorPayment(
     if (validated.billId) {
       const { data: bill, error: be } = await admin
         .from("bills")
-        .select("id, bill_status, balance_due, total_amount, vendor_id")
+        .select("id, bill_number, bill_status, balance_due, total_amount, vendor_id")
         .eq("id", validated.billId)
         .eq("tenant_id", validated.tenantId)
         .eq("entity_id", validated.entityId)
@@ -413,6 +427,21 @@ export async function recordVendorPayment(
         newValues: { amountApplied, billId: validated.billId },
       });
 
+      if (amountApplied > 0) {
+        try {
+          await tryPostApVendorPaymentToGl(admin, ctx, {
+            tenantId: validated.tenantId,
+            entityId: validated.entityId,
+            paymentId: payRow.id,
+            paymentDate: validated.paymentDate,
+            amountApplied,
+            billNumber: bill.bill_number as string,
+          });
+        } catch {
+          /* best-effort AP→GL when Pack 018 bindings exist */
+        }
+      }
+
       return { success: true, message: "Vendor payment recorded.", data: { vendorPaymentId: payRow.id } };
     }
 
@@ -449,6 +478,75 @@ export async function recordVendorPayment(
     });
 
     return { success: true, message: "Vendor payment recorded (unapplied).", data: { vendorPaymentId: payRow.id } };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+const CreateApRecurringVendorChargeSchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid(),
+  vendorId: z.string().uuid(),
+  chargeCode: z.string().min(1).max(64),
+  description: z.string().max(500).optional(),
+  amountEstimate: z.number().min(0),
+  cadence: z.enum(["weekly", "biweekly", "monthly", "quarterly", "annual", "other"]).default("monthly"),
+  nextExpectedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+});
+
+/** Permission: ap.recurring.manage */
+export async function createApRecurringVendorCharge(
+  input: z.infer<typeof CreateApRecurringVendorChargeSchema>
+): Promise<ActionResult<{ recurringChargeId: string }>> {
+  try {
+    const v = CreateApRecurringVendorChargeSchema.parse(input);
+    const ctx = await resolveRequestContext(v.tenantId);
+    requireModuleEntitlement(ctx, "ap");
+    requirePermission(ctx, "ap.recurring.manage");
+    requireEntityScope(ctx, v.entityId);
+
+    const admin = createSupabaseAdminClient();
+    const { data: ven, error: ve } = await admin
+      .from("vendors")
+      .select("id, entity_id")
+      .eq("id", v.vendorId)
+      .eq("tenant_id", v.tenantId)
+      .single();
+    if (ve || !ven) return { success: false, message: "Vendor not found." };
+    if (ven.entity_id != null && ven.entity_id !== v.entityId) {
+      return { success: false, message: "Vendor is not scoped to this entity." };
+    }
+
+    const { data: row, error } = await admin
+      .from("ap_recurring_vendor_charges")
+      .insert({
+        tenant_id: v.tenantId,
+        entity_id: v.entityId,
+        vendor_id: v.vendorId,
+        charge_code: v.chargeCode,
+        description: v.description ?? null,
+        amount_estimate: Number(v.amountEstimate.toFixed(2)),
+        cadence: v.cadence,
+        next_expected_date: v.nextExpectedDate ?? null,
+        is_active: true,
+      })
+      .select("id")
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      tenantId: v.tenantId,
+      entityId: v.entityId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "ap",
+      actionCode: "ap.recurring_charge.create",
+      targetTable: "ap_recurring_vendor_charges",
+      targetRecordId: row.id,
+      newValues: { chargeCode: v.chargeCode, vendorId: v.vendorId },
+    });
+
+    return { success: true, message: "Recurring charge template created.", data: { recurringChargeId: row.id } };
   } catch (err) {
     return mapErrorToResult(err);
   }
