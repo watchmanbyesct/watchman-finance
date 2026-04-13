@@ -18,6 +18,11 @@ const CreateBankAccountSchema = z.object({
   currencyCode: z.string().length(3).default("USD"),
 });
 
+const SeedBankAccountsSchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid(),
+});
+
 /** Permission: banking.account.manage */
 export async function createBankAccount(
   input: z.infer<typeof CreateBankAccountSchema>
@@ -62,6 +67,108 @@ export async function createBankAccount(
     });
 
     return { success: true, message: "Bank account created.", data: { bankAccountId: row.id } };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+type BankAccountSeedTemplate = {
+  accountName: string;
+  bankName: string;
+  accountType: "operating" | "payroll" | "tax" | "savings" | "other";
+  accountNumberLast4: string;
+  routingNumberLast4: string;
+};
+
+const DEFAULT_BANK_ACCOUNTS: BankAccountSeedTemplate[] = [
+  {
+    accountName: "Operating Account",
+    bankName: "Primary Bank",
+    accountType: "operating",
+    accountNumberLast4: "1001",
+    routingNumberLast4: "0210",
+  },
+  {
+    accountName: "Payroll Account",
+    bankName: "Primary Bank",
+    accountType: "payroll",
+    accountNumberLast4: "1002",
+    routingNumberLast4: "0210",
+  },
+  {
+    accountName: "Tax Reserve Account",
+    bankName: "Primary Bank",
+    accountType: "tax",
+    accountNumberLast4: "1003",
+    routingNumberLast4: "0210",
+  },
+];
+
+/**
+ * Seed default bank accounts for an entity.
+ * Permission: banking.account.manage
+ */
+export async function seedBankAccounts(
+  input: z.infer<typeof SeedBankAccountsSchema>
+): Promise<ActionResult<{ seededCount: number; skippedCount: number }>> {
+  try {
+    const validated = SeedBankAccountsSchema.parse(input);
+    const ctx = await resolveRequestContext(validated.tenantId);
+    requireModuleEntitlement(ctx, "banking");
+    requirePermission(ctx, "banking.account.manage");
+    requireEntityScope(ctx, validated.entityId);
+
+    const admin = createSupabaseAdminClient();
+    const { data: existing, error: existingErr } = await admin
+      .from("bank_accounts")
+      .select("account_name, bank_name")
+      .eq("tenant_id", validated.tenantId)
+      .eq("entity_id", validated.entityId);
+
+    if (existingErr) throw new Error(existingErr.message);
+
+    const existingKey = new Set(
+      (existing ?? []).map((r: { account_name: string; bank_name: string }) => `${r.bank_name}::${r.account_name}`)
+    );
+
+    const inserts = DEFAULT_BANK_ACCOUNTS.filter(
+      (a) => !existingKey.has(`${a.bankName}::${a.accountName}`)
+    ).map((a) => ({
+      tenant_id: validated.tenantId,
+      entity_id: validated.entityId,
+      account_name: a.accountName,
+      bank_name: a.bankName,
+      account_type: a.accountType,
+      account_number_last4: a.accountNumberLast4,
+      routing_number_last4: a.routingNumberLast4,
+      currency_code: "USD",
+      is_active: true,
+      allow_incoming: true,
+      allow_outgoing: true,
+    }));
+
+    if (inserts.length) {
+      const { error: insErr } = await admin.from("bank_accounts").insert(inserts);
+      if (insErr) throw new Error(insErr.message);
+    }
+
+    await writeAuditLog({
+      tenantId: validated.tenantId,
+      entityId: validated.entityId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "banking",
+      actionCode: "bank.account.seed_default",
+      targetTable: "bank_accounts",
+      newValues: { seeded: inserts.length, skipped: DEFAULT_BANK_ACCOUNTS.length - inserts.length },
+    });
+
+    return {
+      success: true,
+      message: inserts.length
+        ? `Seeded ${inserts.length} default bank account(s).`
+        : "No new bank accounts to seed.",
+      data: { seededCount: inserts.length, skippedCount: DEFAULT_BANK_ACCOUNTS.length - inserts.length },
+    };
   } catch (err) {
     return mapErrorToResult(err);
   }

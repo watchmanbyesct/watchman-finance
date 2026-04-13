@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { WorkflowPageFrame } from "@/components/finance/workflow-page-frame";
+import { Pack007SeedButton } from "@/components/finance/connected/pack007-seed-button";
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import { getCatalogBillingPack013Flags } from "@/lib/finance/catalog-billing-pack013-flags";
 
@@ -66,6 +67,18 @@ export default async function Page() {
     >
       {workspace && (
         <div className="space-y-6">
+          <Pack007SeedButton
+            tenantId={workspace.tenantId}
+            entityId={workspace.entityId}
+            enabled={
+              !!p13 &&
+              p13.canManageCategories &&
+              p13.canManageItems &&
+              p13.canManagePrices &&
+              p13.canManageBillingRules &&
+              p13.canManageCandidates
+            }
+          />
           <div className="wf-card space-y-4">
             <p className="text-sm text-neutral-400 leading-relaxed">
               Each workflow below loads lists in a server component and exposes mutation forms that call server

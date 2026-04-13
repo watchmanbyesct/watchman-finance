@@ -553,6 +553,93 @@ export async function getFinanceDashboardMetrics(tenantId: string, entityId: str
   };
 }
 
+/** True when at least one GL account exists for the entity. */
+export async function hasChartOfAccountsSeeded(tenantId: string, entityId: string): Promise<boolean> {
+  const supabase = createSupabaseServerClient();
+  const { count, error } = await supabase
+    .from("accounts")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .eq("entity_id", entityId);
+
+  if (error) throw new Error(error.message);
+  return (count ?? 0) > 0;
+}
+
+/** True when at least one fiscal period exists for the entity. */
+export async function hasFiscalPeriodsSeeded(tenantId: string, entityId: string): Promise<boolean> {
+  const supabase = createSupabaseServerClient();
+  const { count, error } = await supabase
+    .from("fiscal_periods")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .eq("entity_id", entityId);
+
+  if (error) throw new Error(error.message);
+  return (count ?? 0) > 0;
+}
+
+/** True when at least one employee pay profile exists for the entity. */
+export async function hasEmployeePayProfilesConfigured(tenantId: string, entityId: string): Promise<boolean> {
+  const supabase = createSupabaseServerClient();
+  const { count, error } = await supabase
+    .from("employee_pay_profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .eq("entity_id", entityId);
+
+  if (error) throw new Error(error.message);
+  return (count ?? 0) > 0;
+}
+
+export async function hasCustomersSeeded(tenantId: string, entityId: string): Promise<boolean> {
+  const supabase = createSupabaseServerClient();
+  const { count, error } = await supabase
+    .from("customers")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .or(`entity_id.is.null,entity_id.eq.${entityId}`);
+
+  if (error) throw new Error(error.message);
+  return (count ?? 0) > 0;
+}
+
+export async function hasVendorsSeeded(tenantId: string, entityId: string): Promise<boolean> {
+  const supabase = createSupabaseServerClient();
+  const { count, error } = await supabase
+    .from("vendors")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .or(`entity_id.is.null,entity_id.eq.${entityId}`);
+
+  if (error) throw new Error(error.message);
+  return (count ?? 0) > 0;
+}
+
+export async function hasBankAccountLinked(tenantId: string, entityId: string): Promise<boolean> {
+  const supabase = createSupabaseServerClient();
+  const { count, error } = await supabase
+    .from("bank_accounts")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .eq("entity_id", entityId);
+
+  if (error) throw new Error(error.message);
+  return (count ?? 0) > 0;
+}
+
+export async function hasPayrollRunsCreated(tenantId: string, entityId: string): Promise<boolean> {
+  const supabase = createSupabaseServerClient();
+  const { count, error } = await supabase
+    .from("payroll_runs")
+    .select("id", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .eq("entity_id", entityId);
+
+  if (error) throw new Error(error.message);
+  return (count ?? 0) > 0;
+}
+
 export async function listInventoryCategoriesForTenant(tenantId: string) {
   const supabase = createSupabaseServerClient();
   const { data, error } = await supabase

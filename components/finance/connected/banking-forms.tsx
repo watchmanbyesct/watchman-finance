@@ -12,6 +12,7 @@ import {
   createTransferRequest,
   importBankTransaction,
   matchBankTransaction,
+  seedBankAccounts,
 } from "@/modules/banking/actions/banking-actions";
 
 const input =
@@ -94,6 +95,39 @@ export function BankAccountCreateForm({ workspace }: { workspace: FinanceWorkspa
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+export function BankAccountSeedButton({ workspace }: { workspace: FinanceWorkspace }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+
+  return (
+    <div className="wf-card border-amber-500/20 bg-amber-950/10 space-y-2.5">
+      <p className="text-sm font-medium text-neutral-100">Seed bank accounts</p>
+      <p className="text-xs text-neutral-500 leading-relaxed">
+        Adds default Operating, Payroll, and Tax accounts for this entity. Safe to re-run.
+      </p>
+      {msg ? <p className="text-xs text-amber-400">{msg}</p> : null}
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => {
+          start(async () => {
+            const res = await seedBankAccounts({
+              tenantId: workspace.tenantId,
+              entityId: workspace.entityId,
+            });
+            setMsg(res.message);
+            if (res.success) router.refresh();
+          });
+        }}
+        className="rounded-md border border-amber-500/30 bg-amber-500/90 px-4 py-2 text-sm font-medium text-black hover:bg-amber-400 disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {pending ? "Seeding…" : "Seed default bank accounts"}
+      </button>
     </div>
   );
 }

@@ -42,6 +42,11 @@ const CreateAccountSchema = z.object({
   ),
 });
 
+const SeedChartOfAccountsSchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid(),
+});
+
 const CreateFiscalPeriodSchema = z.object({
   tenantId:    z.string().uuid(),
   entityId:    z.string().uuid(),
@@ -54,6 +59,12 @@ const CreateFiscalPeriodSchema = z.object({
     const n = Number(v);
     return Number.isFinite(n) ? n : undefined;
   }, z.number().int().min(1).max(12).optional()),
+});
+
+const SeedFiscalPeriodsSchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid(),
+  fiscalYear: z.coerce.number().int().min(2000).max(2100),
 });
 
 const UpdateAccountSchema = z.object({
@@ -212,6 +223,110 @@ export async function createAccount(
   }
 }
 
+type SeedAccountTemplate = {
+  code: string;
+  name: string;
+  categoryCode: string;
+  accountType: string;
+  normalBalance: "debit" | "credit";
+  allowPosting: boolean;
+};
+
+const DEFAULT_COA_TEMPLATES: SeedAccountTemplate[] = [
+  { code: "1000", name: "Cash", categoryCode: "assets_current", accountType: "asset", normalBalance: "debit", allowPosting: true },
+  { code: "1100", name: "Accounts Receivable", categoryCode: "assets_current", accountType: "asset", normalBalance: "debit", allowPosting: true },
+  { code: "1200", name: "Undeposited Funds", categoryCode: "assets_current", accountType: "asset", normalBalance: "debit", allowPosting: true },
+  { code: "1300", name: "Prepaid Expenses", categoryCode: "assets_current", accountType: "asset", normalBalance: "debit", allowPosting: true },
+  { code: "1500", name: "Equipment", categoryCode: "assets_fixed", accountType: "asset", normalBalance: "debit", allowPosting: true },
+  { code: "2000", name: "Accounts Payable", categoryCode: "liabilities_current", accountType: "liability", normalBalance: "credit", allowPosting: true },
+  { code: "2100", name: "Accrued Expenses", categoryCode: "liabilities_current", accountType: "liability", normalBalance: "credit", allowPosting: true },
+  { code: "2200", name: "Payroll Liabilities", categoryCode: "liabilities_current", accountType: "liability", normalBalance: "credit", allowPosting: true },
+  { code: "2500", name: "Long-Term Debt", categoryCode: "liabilities_lt", accountType: "liability", normalBalance: "credit", allowPosting: true },
+  { code: "3000", name: "Owner's Equity", categoryCode: "equity", accountType: "equity", normalBalance: "credit", allowPosting: true },
+  { code: "4000", name: "Service Revenue", categoryCode: "revenue", accountType: "revenue", normalBalance: "credit", allowPosting: true },
+  { code: "5000", name: "Cost of Services", categoryCode: "cogs", accountType: "expense", normalBalance: "debit", allowPosting: true },
+  { code: "6000", name: "Operating Expense", categoryCode: "operating_expense", accountType: "expense", normalBalance: "debit", allowPosting: true },
+  { code: "6100", name: "Payroll Expense", categoryCode: "payroll_expense", accountType: "expense", normalBalance: "debit", allowPosting: true },
+  { code: "7000", name: "Other Income", categoryCode: "other_income", accountType: "revenue", normalBalance: "credit", allowPosting: true },
+  { code: "8000", name: "Other Expense", categoryCode: "other_expense", accountType: "expense", normalBalance: "debit", allowPosting: true },
+];
+
+/**
+ * Seed a default Chart of Accounts template for an entity.
+ * Permission: gl.account.manage
+ */
+export async function seedChartOfAccounts(
+  formData: FormData | Record<string, unknown>
+): Promise<ActionResult<{ seededCount: number }>> {
+  try {
+    const raw = formData instanceof FormData ? Object.fromEntries(formData) : formData;
+    const input = SeedChartOfAccountsSchema.parse(raw);
+    const ctx = await resolveRequestContext(input.tenantId);
+    requirePermission(ctx, "gl.account.manage");
+    requireEntityScope(ctx, input.entityId);
+
+    const admin = createSupabaseAdminClient();
+
+    const { data: categories, error: catError } = await admin
+      .from("account_categories")
+      .select("id, code")
+      .or(`tenant_id.eq.${input.tenantId},tenant_id.is.null`)
+      .eq("status", "active");
+
+    if (catError) throw new Error(catError.message);
+
+    const categoryByCode = new Map<string, string>(
+      (categories ?? []).map((c: { id: string; code: string }) => [c.code, c.id])
+    );
+
+    const missingCategory = DEFAULT_COA_TEMPLATES.find((a) => !categoryByCode.has(a.categoryCode));
+    if (missingCategory) {
+      return {
+        success: false,
+        message: `Missing account category ${missingCategory.categoryCode}. Seed categories first.`,
+      };
+    }
+
+    const rows = DEFAULT_COA_TEMPLATES.map((a) => ({
+      tenant_id: input.tenantId,
+      entity_id: input.entityId,
+      account_category_id: categoryByCode.get(a.categoryCode)!,
+      code: a.code,
+      name: a.name,
+      account_type: a.accountType,
+      normal_balance: a.normalBalance,
+      allow_posting: a.allowPosting,
+      is_active: true,
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error: upsertError } = await admin
+      .from("accounts")
+      .upsert(rows, { onConflict: "entity_id,code" });
+
+    if (upsertError) throw new Error(upsertError.message);
+
+    await writeAuditLog({
+      tenantId: input.tenantId,
+      entityId: input.entityId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "finance_core",
+      actionCode: "gl.account.seed_default",
+      targetTable: "accounts",
+      newValues: { seededCodes: DEFAULT_COA_TEMPLATES.map((a) => a.code) },
+    });
+
+    revalidatePath("/finance/accounts");
+    return {
+      success: true,
+      message: `Seeded ${DEFAULT_COA_TEMPLATES.length} chart of accounts rows (upserted).`,
+      data: { seededCount: DEFAULT_COA_TEMPLATES.length },
+    };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
 /**
  * Create a fiscal period for an entity.
  * Permission: gl.period.close (reused as period management permission)
@@ -279,6 +394,101 @@ export async function createFiscalPeriod(
       success: true,
       message: `Fiscal period ${input.periodName} created.`,
       data: { fiscalPeriodId: period.id },
+    };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+type SeedPeriodRow = {
+  period_name: string;
+  start_date: string;
+  end_date: string;
+  fiscal_month: number;
+};
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+function isoDate(y: number, m1: number, d: number): string {
+  return new Date(Date.UTC(y, m1 - 1, d)).toISOString().slice(0, 10);
+}
+
+function buildMonthlyPeriods(year: number): SeedPeriodRow[] {
+  const rows: SeedPeriodRow[] = [];
+  for (let month = 1; month <= 12; month++) {
+    const start = isoDate(year, month, 1);
+    const end = isoDate(year, month + 1, 0);
+    rows.push({
+      period_name: `${MONTH_NAMES[month - 1]} ${year}`,
+      start_date: start,
+      end_date: end,
+      fiscal_month: month,
+    });
+  }
+  return rows;
+}
+
+/**
+ * Seed 12 monthly fiscal periods for a year.
+ * Permission: gl.period.close (same period management permission as createFiscalPeriod)
+ */
+export async function seedFiscalPeriods(
+  formData: FormData | Record<string, unknown>
+): Promise<ActionResult<{ seededCount: number }>> {
+  try {
+    const raw = formData instanceof FormData ? Object.fromEntries(formData) : formData;
+    const input = SeedFiscalPeriodsSchema.parse(raw);
+    const ctx = await resolveRequestContext(input.tenantId);
+    requirePermission(ctx, "gl.period.close");
+    requireEntityScope(ctx, input.entityId);
+
+    const admin = createSupabaseAdminClient();
+    const periodRows = buildMonthlyPeriods(input.fiscalYear).map((p) => ({
+      tenant_id: input.tenantId,
+      entity_id: input.entityId,
+      period_name: p.period_name,
+      start_date: p.start_date,
+      end_date: p.end_date,
+      fiscal_year: input.fiscalYear,
+      fiscal_month: p.fiscal_month,
+      status: "open",
+      updated_at: new Date().toISOString(),
+    }));
+
+    const { error } = await admin
+      .from("fiscal_periods")
+      .upsert(periodRows, { onConflict: "entity_id,start_date,end_date" });
+
+    if (error) throw new Error(error.message);
+
+    await writeAuditLog({
+      tenantId: input.tenantId,
+      entityId: input.entityId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "finance_core",
+      actionCode: "gl.period.seed_year",
+      targetTable: "fiscal_periods",
+      newValues: { fiscalYear: input.fiscalYear, months: 12 },
+    });
+
+    revalidatePath("/finance/periods");
+    return {
+      success: true,
+      message: `Seeded fiscal periods for ${input.fiscalYear} (upserted 12 months).`,
+      data: { seededCount: 12 },
     };
   } catch (err) {
     return mapErrorToResult(err);
@@ -1028,4 +1238,14 @@ export async function submitCreateAccountForm(formData: FormData): Promise<void>
 /** @see submitCreateAccountForm */
 export async function submitCreateFiscalPeriodForm(formData: FormData): Promise<void> {
   await createFiscalPeriod(formData);
+}
+
+/** @see submitCreateFiscalPeriodForm */
+export async function submitSeedFiscalPeriodsForm(formData: FormData): Promise<void> {
+  await seedFiscalPeriods(formData);
+}
+
+/** @see submitCreateAccountForm */
+export async function submitSeedChartOfAccountsForm(formData: FormData): Promise<void> {
+  await seedChartOfAccounts(formData);
 }

@@ -8,7 +8,18 @@ import Link from "next/link";
 import clsx from "clsx";
 import { WATCHMAN_DEPLOYED_MIGRATION_PACK } from "@/lib/constants/watchman-migrations";
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
-import { getFinanceDashboardMetrics, type FinanceDashboardMetrics } from "@/lib/finance/read-queries";
+import { PlatformSeedAllButton } from "@/components/finance/connected/platform-seed-all-button";
+import {
+  hasBankAccountLinked,
+  getFinanceDashboardMetrics,
+  hasChartOfAccountsSeeded,
+  hasCustomersSeeded,
+  hasEmployeePayProfilesConfigured,
+  hasFiscalPeriodsSeeded,
+  hasPayrollRunsCreated,
+  hasVendorsSeeded,
+  type FinanceDashboardMetrics,
+} from "@/lib/finance/read-queries";
 
 export const metadata = { title: "Dashboard — Watchman Finance" };
 
@@ -151,49 +162,59 @@ function statsFromMetrics(m: FinanceDashboardMetrics): DashboardStat[] {
   ];
 }
 
-const SETUP_CHECKLIST: SetupChecklistItem[] = [
-  { label: "Pack 001 — Foundation (GL, org, audit)", complete: PACK >= 1, href: null },
-  { label: "Pack 002 — Integration staging", complete: PACK >= 2, href: "/finance/integration" },
-  { label: "Pack 003 — AR & AP core", complete: PACK >= 3, href: "/finance/ar-ap" },
-  { label: "Pack 004 — Payroll core", complete: PACK >= 4, href: "/finance/payroll" },
-  { label: "Pack 005 — Leave & accruals", complete: PACK >= 5, href: "/finance/leave" },
-  { label: "Pack 006 — Banking & reconciliation", complete: PACK >= 6, href: "/finance/banking" },
-  { label: "Pack 007 — Catalog & billing", complete: PACK >= 7, href: "/finance/catalog-billing" },
-  { label: "Pack 008 — Inventory & assets", complete: PACK >= 8, href: "/finance/inventory-assets" },
-  { label: "Pack 009 — Reporting & close", complete: PACK >= 9, href: "/finance/reporting-hub" },
-  { label: "Pack 010 — Budgeting & forecasting", complete: PACK >= 10, href: "/finance/planning-hub" },
-  { label: "Pack 011 — Consolidation & commercial", complete: PACK >= 11, href: "/finance/consolidation-commercial-hub" },
-  { label: "Pack 012 — Hardening & QA", complete: PACK >= 12, href: "/finance/operations-hub" },
-  { label: "Pack 013 — Module permissions (007–012 surfaces)", complete: PACK >= 13, href: "/finance/pack-013" },
-  { label: "Pack 014 — Tax, AR statements/collections, AP recurring", complete: PACK >= 14, href: "/finance/tax" },
-  { label: "Pack 015 — Extension permissions (tax, collections, recurring)", complete: PACK >= 15, href: "/finance/pack-015" },
-  { label: "Pack 016 — GL journal posting (manual batches)", complete: PACK >= 16, href: "/finance/journals" },
-  { label: "Pack 017 — Subledger→GL, integration pipeline ops, reporting automation", complete: PACK >= 17, href: "/finance/gl/posting-bindings" },
-  { label: "Pack 018 — GL reversals, AP→GL, payroll.reverse", complete: PACK >= 18, href: "/finance/gl/posting-bindings" },
-  {
-    label: "Packs 019–022 + 023 — Evidence, approvals, TB snapshots, API/webhook diagnostics & permissions",
-    complete: PACK >= 23,
-    href: "/finance/evidence",
-  },
-  {
-    label: "Pack 024 — QuickBooks Online OAuth (Pack 002 extension)",
-    complete: PACK >= 24,
-    href: "/finance/integration/quickbooks",
-  },
-  { label: "ESCT Holdings tenant created", complete: true, href: null },
-  {
-    label: "ESCT entity — Enterprise Security Consulting and Training Inc.",
-    complete: true,
-    href: null,
-  },
-  { label: "Chart of accounts seeded", complete: false, href: "/finance/accounts" },
-  { label: "First fiscal period created", complete: false, href: "/finance/periods" },
-  { label: "First customer added", complete: false, href: "/finance/ar/customers" },
-  { label: "First vendor added", complete: false, href: "/finance/ap/vendors" },
-  { label: "Employee pay profiles configured", complete: false, href: "/finance/payroll/profiles" },
-  { label: "Bank account linked", complete: false, href: "/finance/banking/accounts" },
-  { label: "First payroll run created", complete: false, href: "/finance/payroll/runs" },
-];
+function buildSetupChecklist(
+  chartOfAccountsSeeded: boolean,
+  fiscalPeriodsSeeded: boolean,
+  employeePayProfilesConfigured: boolean,
+  customerSeeded: boolean,
+  vendorSeeded: boolean,
+  bankAccountLinked: boolean,
+  payrollRunCreated: boolean,
+): SetupChecklistItem[] {
+  return [
+    { label: "Pack 001 — Foundation (GL, org, audit)", complete: PACK >= 1, href: null },
+    { label: "Pack 002 — Integration staging", complete: PACK >= 2, href: "/finance/integration" },
+    { label: "Pack 003 — AR & AP core", complete: PACK >= 3, href: "/finance/ar-ap" },
+    { label: "Pack 004 — Payroll core", complete: PACK >= 4, href: "/finance/payroll" },
+    { label: "Pack 005 — Leave & accruals", complete: PACK >= 5, href: "/finance/leave" },
+    { label: "Pack 006 — Banking & reconciliation", complete: PACK >= 6, href: "/finance/banking" },
+    { label: "Pack 007 — Catalog & billing", complete: PACK >= 7, href: "/finance/catalog-billing" },
+    { label: "Pack 008 — Inventory & assets", complete: PACK >= 8, href: "/finance/inventory-assets" },
+    { label: "Pack 009 — Reporting & close", complete: PACK >= 9, href: "/finance/reporting-hub" },
+    { label: "Pack 010 — Budgeting & forecasting", complete: PACK >= 10, href: "/finance/planning-hub" },
+    { label: "Pack 011 — Consolidation & commercial", complete: PACK >= 11, href: "/finance/consolidation-commercial-hub" },
+    { label: "Pack 012 — Hardening & QA", complete: PACK >= 12, href: "/finance/operations-hub" },
+    { label: "Pack 013 — Module permissions (007–012 surfaces)", complete: PACK >= 13, href: "/finance/pack-013" },
+    { label: "Pack 014 — Tax, AR statements/collections, AP recurring", complete: PACK >= 14, href: "/finance/tax" },
+    { label: "Pack 015 — Extension permissions (tax, collections, recurring)", complete: PACK >= 15, href: "/finance/pack-015" },
+    { label: "Pack 016 — GL journal posting (manual batches)", complete: PACK >= 16, href: "/finance/journals" },
+    { label: "Pack 017 — Subledger→GL, integration pipeline ops, reporting automation", complete: PACK >= 17, href: "/finance/gl/posting-bindings" },
+    { label: "Pack 018 — GL reversals, AP→GL, payroll.reverse", complete: PACK >= 18, href: "/finance/gl/posting-bindings" },
+    {
+      label: "Packs 019–022 + 023 — Evidence, approvals, TB snapshots, API/webhook diagnostics & permissions",
+      complete: PACK >= 23,
+      href: "/finance/evidence",
+    },
+    {
+      label: "Pack 024 — QuickBooks Online OAuth (Pack 002 extension)",
+      complete: PACK >= 24,
+      href: "/finance/integration/quickbooks",
+    },
+    { label: "ESCT Holdings tenant created", complete: true, href: null },
+    {
+      label: "ESCT entity — Enterprise Security Consulting and Training Inc.",
+      complete: true,
+      href: null,
+    },
+    { label: "Chart of accounts seeded", complete: chartOfAccountsSeeded, href: "/finance/accounts" },
+    { label: "First fiscal period created", complete: fiscalPeriodsSeeded, href: "/finance/periods" },
+    { label: "First customer added", complete: customerSeeded, href: "/finance/ar/customers" },
+    { label: "First vendor added", complete: vendorSeeded, href: "/finance/ap/vendors" },
+    { label: "Employee pay profiles configured", complete: employeePayProfilesConfigured, href: "/finance/payroll/profiles" },
+    { label: "Bank account linked", complete: bankAccountLinked, href: "/finance/banking/accounts" },
+    { label: "First payroll run created", complete: payrollRunCreated, href: "/finance/payroll/runs" },
+  ];
+}
 
 const MODULE_SCHEMA_STATUS: { name: string; ready: boolean }[] = [
   { name: "Finance Core", ready: PACK >= 1 },
@@ -234,21 +255,75 @@ const QUICK_LINKS = [
 export default async function FinanceDashboardPage() {
   const workspace = await resolveFinanceWorkspace();
   let metrics: FinanceDashboardMetrics | null = null;
+  let chartOfAccountsSeeded = false;
+  let fiscalPeriodsSeeded = false;
+  let employeePayProfilesConfigured = false;
+  let customerSeeded = false;
+  let vendorSeeded = false;
+  let bankAccountLinked = false;
+  let payrollRunCreated = false;
   if (workspace) {
     try {
       metrics = await getFinanceDashboardMetrics(workspace.tenantId, workspace.entityId);
     } catch {
       metrics = null;
     }
+    try {
+      chartOfAccountsSeeded = await hasChartOfAccountsSeeded(workspace.tenantId, workspace.entityId);
+    } catch {
+      chartOfAccountsSeeded = false;
+    }
+    try {
+      fiscalPeriodsSeeded = await hasFiscalPeriodsSeeded(workspace.tenantId, workspace.entityId);
+    } catch {
+      fiscalPeriodsSeeded = false;
+    }
+    try {
+      employeePayProfilesConfigured = await hasEmployeePayProfilesConfigured(
+        workspace.tenantId,
+        workspace.entityId,
+      );
+    } catch {
+      employeePayProfilesConfigured = false;
+    }
+    try {
+      customerSeeded = await hasCustomersSeeded(workspace.tenantId, workspace.entityId);
+    } catch {
+      customerSeeded = false;
+    }
+    try {
+      vendorSeeded = await hasVendorsSeeded(workspace.tenantId, workspace.entityId);
+    } catch {
+      vendorSeeded = false;
+    }
+    try {
+      bankAccountLinked = await hasBankAccountLinked(workspace.tenantId, workspace.entityId);
+    } catch {
+      bankAccountLinked = false;
+    }
+    try {
+      payrollRunCreated = await hasPayrollRunsCreated(workspace.tenantId, workspace.entityId);
+    } catch {
+      payrollRunCreated = false;
+    }
   }
 
   const stats = metrics ? statsFromMetrics(metrics) : FALLBACK_STATS;
+  const setupChecklist = buildSetupChecklist(
+    chartOfAccountsSeeded,
+    fiscalPeriodsSeeded,
+    employeePayProfilesConfigured,
+    customerSeeded,
+    vendorSeeded,
+    bankAccountLinked,
+    payrollRunCreated,
+  );
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long", year: "numeric", month: "long", day: "numeric",
   });
-  const checklistDone = SETUP_CHECKLIST.filter((i) => i.complete).length;
+  const checklistDone = setupChecklist.filter((i) => i.complete).length;
   const packLabel = String(WATCHMAN_DEPLOYED_MIGRATION_PACK).padStart(3, "0");
-  const checklistPct = Math.round((checklistDone / SETUP_CHECKLIST.length) * 100);
+  const checklistPct = Math.round((checklistDone / setupChecklist.length) * 100);
   const modulesLive = MODULE_SCHEMA_STATUS.filter((m) => m.ready).length;
 
   return (
@@ -378,8 +453,14 @@ export default async function FinanceDashboardPage() {
             </div>
           </div>
 
+          {workspace ? (
+            <div className="mb-4">
+              <PlatformSeedAllButton tenantId={workspace.tenantId} entityId={workspace.entityId} />
+            </div>
+          ) : null}
+
           <div className="max-h-[min(70vh,520px)] space-y-1 overflow-y-auto pr-1 [-webkit-overflow-scrolling:touch]">
-            {SETUP_CHECKLIST.map((item) => (
+            {setupChecklist.map((item) => (
               <div
                 key={item.label}
                 className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-white/[0.04]"

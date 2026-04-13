@@ -1,6 +1,6 @@
 import { WorkflowPageFrame } from "@/components/finance/workflow-page-frame";
 import { WorkflowDataTable } from "@/components/finance/workflow-data-table";
-import { BankAccountCreateForm } from "@/components/finance/connected/banking-forms";
+import { BankAccountCreateForm, BankAccountSeedButton } from "@/components/finance/connected/banking-forms";
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import { listBankAccountsForEntity } from "@/lib/finance/read-queries";
 
@@ -30,6 +30,7 @@ export default async function Page() {
     >
       {workspace && !loadError && (
         <>
+          <BankAccountSeedButton workspace={workspace} />
           <BankAccountCreateForm workspace={workspace} />
           <div>
             <h2 className="text-sm font-medium text-neutral-300 mb-3">Accounts</h2>

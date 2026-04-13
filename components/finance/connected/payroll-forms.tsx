@@ -13,6 +13,7 @@ import {
   finalizePayrollRun,
   loadApprovedTimeIntoPayrollRun,
   reversePayrollRun,
+  seedEmployeePayProfiles,
 } from "@/modules/payroll/actions/payroll-actions";
 
 const input =
@@ -275,6 +276,48 @@ export function EmployeePayProfileForm({
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+export function EmployeePayProfileSeedButton({
+  workspace,
+  peopleCount,
+}: {
+  workspace: FinanceWorkspace;
+  peopleCount: number;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+
+  return (
+    <div className="wf-card border-amber-500/20 bg-amber-950/10 space-y-2.5">
+      <p className="text-sm font-medium text-neutral-100">Seed employee profiles</p>
+      <p className="text-xs text-neutral-500 leading-relaxed">
+        Creates pay profiles for active finance people without one. Uses the first active pay group when available.
+      </p>
+      <p className="text-xs text-neutral-600">Finance people in tenant: {peopleCount}</p>
+      {msg ? <p className="text-xs text-amber-400">{msg}</p> : null}
+      <button
+        type="button"
+        disabled={pending || peopleCount === 0}
+        onClick={() => {
+          start(async () => {
+            const res = await seedEmployeePayProfiles({
+              tenantId: workspace.tenantId,
+              entityId: workspace.entityId,
+              defaultPayType: "hourly",
+              defaultBaseRate: 25,
+            });
+            setMsg(res.message);
+            if (res.success) router.refresh();
+          });
+        }}
+        className="rounded-md border border-amber-500/30 bg-amber-500/90 px-4 py-2 text-sm font-medium text-black hover:bg-amber-400 disabled:opacity-60 disabled:cursor-not-allowed"
+      >
+        {pending ? "Seeding…" : "Seed profiles"}
+      </button>
     </div>
   );
 }

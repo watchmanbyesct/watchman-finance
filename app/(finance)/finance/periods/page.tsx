@@ -5,6 +5,7 @@ import { GlWorkspaceBanner } from "@/components/finance/gl/gl-workspace-banner";
 import { GlSetupRequired } from "@/components/finance/gl/gl-setup-required";
 import { FiscalPeriodCreateForm } from "@/components/finance/gl/fiscal-period-create-form";
 import { FiscalPeriodsTable } from "@/components/finance/gl/fiscal-periods-table";
+import { FiscalPeriodSeedButton } from "@/components/finance/gl/fiscal-period-seed-button";
 
 export const metadata = { title: "Fiscal Periods — Watchman Finance" };
 
@@ -50,6 +51,7 @@ export default async function Page() {
         </div>
       ) : (
         <>
+          <FiscalPeriodSeedButton tenantId={workspace.tenantId} entityId={workspace.entityId} />
           <FiscalPeriodCreateForm workspace={workspace} />
 
           <div>

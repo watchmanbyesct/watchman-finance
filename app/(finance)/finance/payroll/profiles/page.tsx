@@ -1,6 +1,6 @@
 import { WorkflowPageFrame } from "@/components/finance/workflow-page-frame";
 import { WorkflowDataTable } from "@/components/finance/workflow-data-table";
-import { EmployeePayProfileForm } from "@/components/finance/connected/payroll-forms";
+import { EmployeePayProfileForm, EmployeePayProfileSeedButton } from "@/components/finance/connected/payroll-forms";
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import {
   listEmployeePayProfilesForEntity,
@@ -43,6 +43,7 @@ export default async function Page() {
     >
       {workspace && !loadError && (
         <>
+          <EmployeePayProfileSeedButton workspace={workspace} peopleCount={people.length} />
           <EmployeePayProfileForm workspace={workspace} people={people} payGroups={groups} />
           <div>
             <h2 className="text-sm font-medium text-neutral-300 mb-3">Profiles</h2>

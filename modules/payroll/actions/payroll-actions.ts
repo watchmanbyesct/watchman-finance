@@ -147,6 +147,13 @@ const CreateEmployeePayProfileSchema = z.object({
   effectiveStartDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
+const SeedEmployeePayProfilesSchema = z.object({
+  tenantId: z.string().uuid(),
+  entityId: z.string().uuid(),
+  defaultPayType: z.enum(["hourly", "salary"]).default("hourly"),
+  defaultBaseRate: z.number().min(0).default(25),
+});
+
 /** Permission: payroll.profile.manage */
 export async function createEmployeePayProfile(
   input: z.infer<typeof CreateEmployeePayProfileSchema>
@@ -207,6 +214,97 @@ export async function createEmployeePayProfile(
     });
 
     return { success: true, message: "Employee pay profile created.", data: { employeePayProfileId: row.id } };
+  } catch (err) {
+    return mapErrorToResult(err);
+  }
+}
+
+/**
+ * Seed employee pay profiles for active finance_people in an entity scope.
+ * Permission: payroll.profile.manage
+ */
+export async function seedEmployeePayProfiles(
+  input: z.infer<typeof SeedEmployeePayProfilesSchema>
+): Promise<ActionResult<{ seededCount: number; skippedCount: number }>> {
+  try {
+    const validated = SeedEmployeePayProfilesSchema.parse(input);
+    const ctx = await resolveRequestContext(validated.tenantId);
+    requireModuleEntitlement(ctx, "payroll");
+    requirePermission(ctx, "payroll.profile.manage");
+    requireEntityScope(ctx, validated.entityId);
+
+    const admin = createSupabaseAdminClient();
+
+    const [peopleRes, profilesRes, groupRes] = await Promise.all([
+      admin
+        .from("finance_people")
+        .select("id, entity_id")
+        .eq("tenant_id", validated.tenantId)
+        .eq("employment_status", "active")
+        .or(`entity_id.is.null,entity_id.eq.${validated.entityId}`),
+      admin
+        .from("employee_pay_profiles")
+        .select("finance_person_id")
+        .eq("tenant_id", validated.tenantId),
+      admin
+        .from("pay_groups")
+        .select("id")
+        .eq("tenant_id", validated.tenantId)
+        .eq("entity_id", validated.entityId)
+        .eq("status", "active")
+        .order("group_code", { ascending: true })
+        .limit(1)
+        .maybeSingle(),
+    ]);
+
+    if (peopleRes.error) throw new Error(peopleRes.error.message);
+    if (profilesRes.error) throw new Error(profilesRes.error.message);
+    if (groupRes.error) throw new Error(groupRes.error.message);
+
+    const existing = new Set((profilesRes.data ?? []).map((r: { finance_person_id: string }) => r.finance_person_id));
+    const toInsert = (peopleRes.data ?? [])
+      .filter((p: { id: string }) => !existing.has(p.id))
+      .map((p: { id: string }) => ({
+        tenant_id: validated.tenantId,
+        entity_id: validated.entityId,
+        finance_person_id: p.id,
+        pay_group_id: groupRes.data?.id ?? null,
+        employee_number: `EMP-${p.id.replace(/-/g, "").slice(0, 8).toUpperCase()}`,
+        worker_type: "employee",
+        pay_type: validated.defaultPayType,
+        base_rate: validated.defaultPayType === "hourly" ? validated.defaultBaseRate : null,
+        annual_salary: validated.defaultPayType === "salary" ? 52000 : null,
+        overtime_eligible: true,
+        payroll_status: "active",
+        effective_start_date: new Date().toISOString().slice(0, 10),
+      }));
+
+    if (!toInsert.length) {
+      return { success: true, message: "No new employee pay profiles to seed.", data: { seededCount: 0, skippedCount: existing.size } };
+    }
+
+    const { error: insErr } = await admin.from("employee_pay_profiles").insert(toInsert);
+    if (insErr) throw new Error(insErr.message);
+
+    await writeAuditLog({
+      tenantId: validated.tenantId,
+      entityId: validated.entityId,
+      actorPlatformUserId: ctx.platformUserId,
+      moduleKey: "payroll",
+      actionCode: "payroll.profile.seed",
+      targetTable: "employee_pay_profiles",
+      newValues: {
+        seededCount: toInsert.length,
+        defaultPayType: validated.defaultPayType,
+        defaultBaseRate: validated.defaultBaseRate,
+      },
+    });
+
+    return {
+      success: true,
+      message: `Seeded ${toInsert.length} employee pay profile(s).`,
+      data: { seededCount: toInsert.length, skippedCount: existing.size },
+    };
   } catch (err) {
     return mapErrorToResult(err);
   }

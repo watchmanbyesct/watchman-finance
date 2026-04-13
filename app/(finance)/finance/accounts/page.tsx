@@ -5,6 +5,7 @@ import { GlWorkspaceBanner } from "@/components/finance/gl/gl-workspace-banner";
 import { GlSetupRequired } from "@/components/finance/gl/gl-setup-required";
 import { AccountCreateForm } from "@/components/finance/gl/account-create-form";
 import { AccountsTable } from "@/components/finance/gl/accounts-table";
+import { AccountSeedButton } from "@/components/finance/gl/account-seed-button";
 
 export const metadata = { title: "Chart of Accounts — Watchman Finance" };
 
@@ -54,6 +55,7 @@ export default async function Page() {
         </div>
       ) : (
         <>
+          <AccountSeedButton tenantId={workspace.tenantId} entityId={workspace.entityId} />
           <AccountCreateForm
             workspace={workspace}
             categories={categories as { id: string; code: string; name: string }[]}
