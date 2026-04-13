@@ -23,12 +23,21 @@ export function UserAdminPanel({ tenants, tenantId, snapshot }: Props) {
   const [pending, start] = useTransition();
   const [notice, setNotice] = useState<{ kind: "ok" | "err"; text: string } | null>(null);
 
-  function handleActionResult(result: { success: boolean; message: string }) {
+  function handleActionResult(result: {
+    success: boolean;
+    message: string;
+    errors?: Array<{ message: string }>;
+  }) {
     if (result.success) {
       setNotice({ kind: "ok", text: result.message });
       router.refresh();
     } else {
-      setNotice({ kind: "err", text: result.message });
+      const detail = result.errors?.[0]?.message;
+      const fullText =
+        result.message.includes("An internal error occurred") && detail
+          ? `${result.message} (${detail})`
+          : result.message;
+      setNotice({ kind: "err", text: fullText });
     }
   }
 

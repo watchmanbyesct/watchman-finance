@@ -488,9 +488,83 @@ export async function inviteUserToTenant(
       .single();
     if (!ent) return { success: false, message: "Default entity not found for this tenant." };
 
-    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+    const normalizedEmail = parsed.email.toLowerCase().trim();
 
-    const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(parsed.email, {
+    const { data: existingPlatformUser } = await admin
+      .from("platform_users")
+      .select("id")
+      .eq("email", normalizedEmail)
+      .maybeSingle();
+
+    if (existingPlatformUser) {
+      const { error: memErr } = await admin.from("tenant_memberships").upsert(
+        {
+          tenant_id: parsed.tenantId,
+          platform_user_id: existingPlatformUser.id,
+          membership_status: "active",
+          default_entity_id: parsed.defaultEntityId,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: "tenant_id,platform_user_id" },
+      );
+      if (memErr) return { success: false, message: `Could not add membership: ${memErr.message}` };
+
+      const { error: scopeErr } = await admin.from("user_entity_scopes").upsert(
+        {
+          tenant_id: parsed.tenantId,
+          platform_user_id: existingPlatformUser.id,
+          entity_id: parsed.defaultEntityId,
+        },
+        { onConflict: "tenant_id,platform_user_id,entity_id" },
+      );
+      if (scopeErr) return { success: false, message: `Could not set entity scope: ${scopeErr.message}` };
+
+      if (parsed.roleId) {
+        const { data: role } = await admin
+          .from("roles")
+          .select("id")
+          .eq("id", parsed.roleId)
+          .eq("tenant_id", parsed.tenantId)
+          .single();
+        if (!role) return { success: false, message: "Role not found for this tenant." };
+
+        const { error: raErr } = await admin.from("user_role_assignments").upsert(
+          {
+            tenant_id: parsed.tenantId,
+            platform_user_id: existingPlatformUser.id,
+            role_id: parsed.roleId,
+            is_active: true,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: "tenant_id,platform_user_id,role_id" },
+        );
+        if (raErr) return { success: false, message: `Could not assign role: ${raErr.message}` };
+      }
+
+      await writeAuditLog({
+        tenantId: parsed.tenantId,
+        entityId: parsed.defaultEntityId,
+        actorPlatformUserId: ctx.platformUserId,
+        moduleKey: "finance_core",
+        actionCode: "user.membership_add",
+        targetTable: "tenant_memberships",
+        targetRecordId: existingPlatformUser.id,
+        newValues: { email: normalizedEmail, roleId: parsed.roleId ?? null },
+      });
+
+      revalidatePath("/admin/users");
+      return {
+        success: true,
+        message: "Existing platform user added to tenant (membership + scope updated).",
+      };
+    }
+
+    const baseUrl = (
+      process.env.NEXT_PUBLIC_APP_URL ??
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:3000")
+    ).replace(/\/$/, "");
+
+    const { data: inviteData, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(normalizedEmail, {
       data: { full_name: parsed.fullName },
       redirectTo: `${baseUrl}/auth/callback`,
     });
@@ -510,7 +584,7 @@ export async function inviteUserToTenant(
     const { error: puErr } = await admin.from("platform_users").upsert(
       {
         auth_user_id: authUserId,
-        email:        parsed.email.toLowerCase().trim(),
+        email:        normalizedEmail,
         full_name:    parsed.fullName.trim(),
         status:       "active",
         updated_at:   new Date().toISOString(),
@@ -518,7 +592,7 @@ export async function inviteUserToTenant(
       { onConflict: "auth_user_id" },
     );
 
-    if (puErr) throw new Error(puErr.message);
+    if (puErr) return { success: false, message: `Could not create platform user: ${puErr.message}` };
 
     const { data: puRow } = await admin
       .from("platform_users")
@@ -539,9 +613,9 @@ export async function inviteUserToTenant(
       { onConflict: "tenant_id,platform_user_id" },
     );
 
-    if (memErr) throw new Error(memErr.message);
+    if (memErr) return { success: false, message: `Could not create tenant membership: ${memErr.message}` };
 
-    await admin.from("user_entity_scopes").upsert(
+    const { error: scopeErr } = await admin.from("user_entity_scopes").upsert(
       {
         tenant_id:        parsed.tenantId,
         platform_user_id: puRow.id,
@@ -549,6 +623,7 @@ export async function inviteUserToTenant(
       },
       { onConflict: "tenant_id,platform_user_id,entity_id" },
     );
+    if (scopeErr) return { success: false, message: `Could not set entity scope: ${scopeErr.message}` };
 
     if (parsed.roleId) {
       const { data: role } = await admin
@@ -571,7 +646,7 @@ export async function inviteUserToTenant(
         { onConflict: "tenant_id,platform_user_id,role_id" },
       );
 
-      if (raErr) throw new Error(raErr.message);
+      if (raErr) return { success: false, message: `Could not assign role: ${raErr.message}` };
     }
 
     await writeAuditLog({
