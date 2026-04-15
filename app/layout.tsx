@@ -35,6 +35,7 @@ export const metadata: Metadata = {
   description: "Financial operating system for the Watchman ecosystem.",
   icons: {
     icon: "/branding/watchman-by-esct.png",
+    shortcut: "/branding/watchman-by-esct.png",
     apple: "/branding/watchman-by-esct.png",
   },
 };
