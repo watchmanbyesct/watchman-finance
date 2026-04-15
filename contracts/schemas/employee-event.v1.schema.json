@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "watchman/contracts/employee-event.v1",
+  "title": "Watchman Employee Event v1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "event_type",
+    "event_id",
+    "occurred_at",
+    "tenant_id",
+    "employee"
+  ],
+  "properties": {
+    "schema_version": { "const": "employee.v1" },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "employee.created",
+        "employee.updated",
+        "employee.status_changed",
+        "employee.terminated"
+      ]
+    },
+    "event_id": { "type": "string", "minLength": 1 },
+    "occurred_at": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "employee": {
+      "type": "object",
+      "required": ["employee_id", "first_name", "last_name", "status", "roles"],
+      "properties": {
+        "employee_id": { "type": "string", "minLength": 1 },
+        "auth_id": { "type": ["string", "null"] },
+        "external_ref": { "type": ["string", "null"] },
+        "first_name": { "type": "string", "minLength": 1 },
+        "last_name": { "type": "string", "minLength": 1 },
+        "email": { "type": ["string", "null"] },
+        "phone": { "type": ["string", "null"] },
+        "status": {
+          "type": "string",
+          "enum": ["active", "inactive", "terminated", "leave"]
+        },
+        "hire_date": { "type": ["string", "null"] },
+        "termination_date": { "type": ["string", "null"] },
+        "department": { "type": ["string", "null"] },
+        "position": { "type": ["string", "null"] },
+        "branch_code": { "type": ["string", "null"] },
+        "roles": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

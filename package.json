@@ -4,7 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "contracts:check": "node ./scripts/check-contracts.mjs",
+    "synthetic:check": "node ./scripts/synthetic-flow-check.mjs",
+    "synthetic:live": "node ./scripts/synthetic-live-probe.mjs",
+    "build": "npm run contracts:check && npm run synthetic:check && next build",
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",

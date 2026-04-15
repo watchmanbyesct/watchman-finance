@@ -1,0 +1,39 @@
+name: Synthetic Live Probe
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/15 * * * *"
+
+jobs:
+  synthetic-live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run synthetic live probe
+        env:
+          WATCHMAN_SYNTHETIC_REQUIRE_TARGETS: "1"
+          WATCHMAN_SYNTHETIC_TIMEOUT_MS: "10000"
+          WATCHMAN_FINANCE_BASE_URL: ${{ secrets.WATCHMAN_FINANCE_BASE_URL }}
+        run: npm run synthetic:live
+
+      - name: Notify alert webhook on failure
+        if: ${{ failure() && secrets.WATCHMAN_ALERT_WEBHOOK != '' }}
+        env:
+          WATCHMAN_ALERT_WEBHOOK: ${{ secrets.WATCHMAN_ALERT_WEBHOOK }}
+        run: |
+          curl -sS -X POST "$WATCHMAN_ALERT_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\":\"[Finance] Synthetic live probe failed in ${GITHUB_REPOSITORY} on ${GITHUB_REF_NAME}. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"

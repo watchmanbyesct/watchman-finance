@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "watchman/contracts/integration-envelope.v1",
+  "title": "Watchman Integration Envelope v1",
+  "type": "object",
+  "required": ["tenant_id", "source_record_id"],
+  "properties": {
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "entity_id": { "type": ["string", "null"] },
+    "source_record_id": { "type": "string", "minLength": 1 },
+    "correlation_id": { "type": ["string", "null"] }
+  },
+  "additionalProperties": true
+}
