@@ -1,6 +1,7 @@
 /**
- * Copyright 2026 ESCT Holdings Inc.
- * Developed by Owens F. Shepard for ESCT Holdings Inc.
+ * Watchman by ESCT is a product developed by Owens F. Shepard for ESCT Holdings Inc.
+ * Copyright (c) 2026 ESCT Holdings Inc. All rights reserved.
+ * Proprietary and confidential software.
  */
 
 import {
@@ -227,7 +228,7 @@ function buildSetupChecklist(
     },
     { label: "ESCT Holdings tenant created", complete: true, href: null },
     {
-      label: "ESCT entity — Enterprise Security Consulting and Training Inc.",
+      label: "Primary tenant entity — Enterprise Security Consulting and Training Inc.",
       complete: true,
       href: null,
     },

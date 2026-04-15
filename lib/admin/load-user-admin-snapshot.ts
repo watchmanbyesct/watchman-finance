@@ -1,3 +1,9 @@
+/**
+ * Watchman by ESCT is a product developed by Owens F. Shepard for ESCT Holdings Inc.
+ * Copyright (c) 2026 ESCT Holdings Inc. All rights reserved.
+ * Proprietary and confidential software.
+ */
+
 import { createSupabaseAdminClient } from "@/lib/db/supabase-server";
 import { assertCanManageUsersForTenant } from "@/lib/admin/user-admin-access";
 import { resolveRequestContext } from "@/lib/context/resolve-request-context";

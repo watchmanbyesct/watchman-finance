@@ -70,7 +70,7 @@ npm run greenfield:bootstrap -- \
   --name='Owens Shepard'
 ```
 
-This creates the ESCT Holdings tenant, ESCT entity (Enterprise Security Consulting and Training Inc.), seeds all roles,
+This creates the ESCT Holdings tenant and a primary tenant entity (Enterprise Security Consulting and Training Inc.), then seeds all roles,
 permissions, module entitlements, and account categories.
 
 ### 7. Start the dev server
