@@ -30,10 +30,14 @@ jobs:
         run: npm run synthetic:live
 
       - name: Notify alert webhook on failure
-        if: ${{ failure() && secrets.WATCHMAN_ALERT_WEBHOOK != '' }}
+        if: ${{ failure() }}
         env:
           WATCHMAN_ALERT_WEBHOOK: ${{ secrets.WATCHMAN_ALERT_WEBHOOK }}
         run: |
+          if [ -z "$WATCHMAN_ALERT_WEBHOOK" ]; then
+            echo "WATCHMAN_ALERT_WEBHOOK is not configured; skipping alert."
+            exit 0
+          fi
           curl -sS -X POST "$WATCHMAN_ALERT_WEBHOOK" \
             -H "Content-Type: application/json" \
             -d "{\"text\":\"[Finance] Synthetic live probe failed in ${GITHUB_REPOSITORY} on ${GITHUB_REF_NAME}. Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}\"}"
