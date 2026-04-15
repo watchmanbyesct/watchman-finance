@@ -12,6 +12,9 @@ const PUBLIC_PATHS = [
   "/auth/callback",
   "/api/health",
   "/api/integrations/accounting-oauth/webhook",
+  "/api/integrations/launch/employees",
+  "/api/integrations/operations/approved-time",
+  "/api/integrations/operations/invoices",
 ];
 
 /** Public files under /public (logos, icons) must not require session — image requests are separate from the page. */
