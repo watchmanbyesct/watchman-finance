@@ -41,9 +41,23 @@ export default async function Page() {
       {workspace && (
         <div className="space-y-6">
           <div className="wf-card space-y-3">
+            <div className="inline-flex items-center rounded-full border border-amber-700/40 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+              Workflow Shell: consolidation lifecycle partially implemented
+            </div>
             <h2 className="text-sm font-medium text-neutral-200">Consolidation</h2>
             <p className="text-xs text-neutral-500">
               Uses <code className="text-neutral-400">consolidation.group.manage</code> on server actions.
+            </p>
+            <p className="text-xs text-neutral-500">
+              New setup flow: create{" "}
+              <Link href="/finance/consolidation/groups" className="text-amber-500 hover:text-amber-400">
+                groups
+              </Link>{" "}
+              then map{" "}
+              <Link href="/finance/consolidation/relationships" className="text-amber-500 hover:text-amber-400">
+                entity relationships
+              </Link>{" "}
+              before snapshot runs.
             </p>
             <ul className="space-y-2 text-sm">
               {CONSOLIDATION.map((l) => (
@@ -56,7 +70,21 @@ export default async function Page() {
             </ul>
           </div>
           <div className="wf-card space-y-3">
+            <div className="inline-flex items-center rounded-full border border-amber-700/40 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+              Workflow Shell: commercialization orchestration deferred
+            </div>
             <h2 className="text-sm font-medium text-neutral-200">Commercial readiness</h2>
+            <p className="text-xs text-neutral-500">
+              Start from{" "}
+              <Link href="/finance/commercial/provisioning-templates" className="text-amber-500 hover:text-amber-400">
+                provisioning templates
+              </Link>{" "}
+              and{" "}
+              <Link href="/finance/commercial/bootstrap" className="text-amber-500 hover:text-amber-400">
+                tenant bootstrap
+              </Link>{" "}
+              before activation tasks and client portal profiles.
+            </p>
             <ul className="space-y-2 text-sm">
               {COMMERCIAL.map((l) => (
                 <li key={l.href}>

@@ -23,7 +23,7 @@ export default async function Page() {
   return (
     <WorkflowPageFrame
       title="Pack 006 — Banking & reconciliation"
-      moduleLine="Migration pack 006: bank accounts, transactions, receipt matching, reconciliation sessions, and internal transfer requests."
+      moduleLine="Pack 006 foundation: bank accounts, transactions, receipt matching, reconciliation sessions, and internal transfer requests."
       packNumber={6}
       workspaceName="Banking"
       workspace={workspace}
@@ -33,6 +33,13 @@ export default async function Page() {
           <p className="text-sm text-neutral-400 leading-relaxed">
             Link operating accounts, import activity, match lines to open reconciliations, move reconciliations
             through approve and close, and route internal transfers with an approval step.
+          </p>
+          <p className="text-xs text-neutral-500">
+            Start here: add{" "}
+            <Link href="/finance/banking/accounts" className="text-amber-500 hover:text-amber-400">
+              bank accounts
+            </Link>{" "}
+            first, then load transactions and begin reconciliations.
           </p>
           <ul className="space-y-2 text-sm">
             {LINKS.map((l) => (

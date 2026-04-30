@@ -26,7 +26,7 @@ export default async function Page() {
           <h1 className="wf-page-title">Trial balance snapshots</h1>
           <p className="text-sm text-neutral-500 mt-1">Pack 021 — Cached trial balance JSON</p>
         </div>
-        <ModuleWorkspaceStatus packNumber={23} workspaceName="Reporting" />
+        <ModuleWorkspaceStatus packNumber={21} workspaceName="Reporting" />
         <GlSetupRequired />
       </div>
     );
@@ -47,12 +47,15 @@ export default async function Page() {
   return (
     <WorkflowPageFrame
       title="Trial balance snapshots"
-      moduleLine="Pack 021 — Persist balanced totals and JSON payloads keyed by entity, fiscal period, as-of date, and snapshot kind."
-      packNumber={23}
+      moduleLine="Pack 021 trial-balance snapshot cache with Pack 023 permission bridge. Persist balanced totals and JSON payloads by entity/period/as-of date."
+      packNumber={21}
       workspaceName="Reporting"
       workspace={workspace}
       loadError={loadError}
     >
+      <div className="inline-flex items-center rounded-full border border-amber-700/40 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+        Workflow Shell: scheduled generation and reconciliation checks deferred
+      </div>
       <p className="text-sm text-neutral-500">
         Back to{" "}
         <Link href="/finance/reporting-hub" className="text-amber-500 hover:text-amber-400">
@@ -62,7 +65,7 @@ export default async function Page() {
         <Link href="/finance/periods" className="text-amber-500 hover:text-amber-400">
           Fiscal periods
         </Link>
-        .
+        . If you have no snapshots, create at least one fiscal period first.
       </p>
 
       <GlTrialBalanceSnapshotForm workspace={workspace} fiscalPeriods={fiscalPeriods} />

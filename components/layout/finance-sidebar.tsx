@@ -18,7 +18,7 @@ import {
   LayoutGrid, DollarSign, Scale, Sparkles, AlertTriangle, Gauge, GitCompare,
   GitBranch, Link2, Flag, Rocket, UserCircle, FileCode, PieChart,
   Beaker, PlayCircle, ListChecks, Bell, Cpu, BookMarked, Database, RotateCcw, Mountain,
-  Percent, FileCheck2, ClipboardCheck, Radio, Calculator,
+  Percent, FileCheck2, ClipboardCheck, Radio, Calculator, FileBadge2,
 } from "lucide-react";
 
 interface NavItem {
@@ -200,12 +200,18 @@ const NAV: NavGroup[] = [
     ],
   },
   {
-    title: "Evidence & diagnostics (Packs 019–022)",
+    title: "Estimates & proposals",
+    items: [
+      { label: "Pricing engine", href: "/finance/estimates-proposals", icon: FileBadge2 },
+    ],
+  },
+  {
+    title: "Evidence & diagnostics (Packs 019–023)",
     items: [
       { label: "Evidence documents", href: "/finance/evidence", icon: FileCheck2 },
       { label: "Approval requests", href: "/finance/approvals", icon: ClipboardCheck },
       { label: "Trial balance snapshots", href: "/finance/reporting/trial-balance-snapshots", icon: Scale },
-      { label: "API & webhook log", href: "/finance/integration/delivery-log", icon: Radio },
+      { label: "API & webhook diagnostics", href: "/finance/integration/delivery-log", icon: Radio },
     ],
   },
   {

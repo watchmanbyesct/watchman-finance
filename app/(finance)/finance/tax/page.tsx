@@ -25,8 +25,8 @@ export default async function Page() {
   return (
     <WorkflowPageFrame
       title="Pack 014 — Tax, AR statements, collections, AP recurring"
-      moduleLine="Packs 014–015: Pack 014 defines tax/statutory tables, direct deposit batches, AR statement runs, collection tasks, and AP recurring charges. Pack 015 seeds permissions and the tax module entitlement."
-      packNumber={15}
+      moduleLine="Pack 014 foundation with Pack 015 permission bridge: tax/statutory tables, direct deposit batches, AR statement runs, collection tasks, and AP recurring charges."
+      packNumber={14}
       workspaceName="Tax & extensions"
       workspace={workspace}
     >
@@ -37,6 +37,13 @@ export default async function Page() {
             entity-scoped. Enable the <code className="text-neutral-500">tax</code> module and grant{" "}
             <code className="text-neutral-500">tax.profile.manage</code> /{" "}
             <code className="text-neutral-500">tax.liability.record</code> after migration 015.
+          </p>
+          <p className="text-xs text-neutral-500">
+            Start here: define{" "}
+            <Link href="/finance/tax/jurisdictions" className="text-amber-500 hover:text-amber-400">
+              jurisdictions
+            </Link>{" "}
+            and employer profiles, then move into liabilities, filings, and compliance tasks.
           </p>
           <ul className="space-y-2 text-sm">
             {LINKS.map((l) => (

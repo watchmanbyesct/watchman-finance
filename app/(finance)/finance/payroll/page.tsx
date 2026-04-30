@@ -25,7 +25,7 @@ export default async function Page() {
   return (
     <WorkflowPageFrame
       title="Pack 004 — Payroll core"
-      moduleLine="Migration pack 004: pay groups, periods, profiles, runs, inputs, run items, and pay statements (GL and full tax deferred)."
+      moduleLine="Pack 004 foundation: pay groups, periods, profiles, runs, inputs, run items, and pay statements (extended GL/tax automation lands in later packs)."
       packNumber={4}
       workspaceName="Payroll"
       workspace={workspace}
@@ -36,6 +36,17 @@ export default async function Page() {
             Configure groups and periods, attach pay profiles to finance people, then create a run and use the
             pipeline on the runs page: load approved staged time, calculate, approve, and finalize to generate
             statements.
+          </p>
+          <p className="text-xs text-neutral-500">
+            Start here: set up{" "}
+            <Link href="/finance/payroll/groups" className="text-amber-500 hover:text-amber-400">
+              pay groups
+            </Link>{" "}
+            and{" "}
+            <Link href="/finance/payroll/periods" className="text-amber-500 hover:text-amber-400">
+              pay periods
+            </Link>
+            , then configure profiles before running payroll.
           </p>
           <ul className="space-y-2 text-sm">
             {LINKS.map((l) => (

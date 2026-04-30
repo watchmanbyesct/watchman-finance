@@ -23,7 +23,7 @@ export default async function Page() {
   return (
     <WorkflowPageFrame
       title="Pack 005 — Leave & accruals"
-      moduleLine="Migration pack 005: types, policies, assignments, requests, approvals, profiles, balance ledger, and accrual heuristics."
+      moduleLine="Pack 005 foundation: leave types, policies, assignments, requests, approvals, and balance ledger accruals."
       packNumber={5}
       workspaceName="Leave & Accruals"
       workspace={workspace}
@@ -33,6 +33,13 @@ export default async function Page() {
           <p className="text-sm text-neutral-400 leading-relaxed">
             Configure types and policies, assign policies to finance people, submit and approve requests, then run
             accruals and review the balance ledger.
+          </p>
+          <p className="text-xs text-neutral-500">
+            Start here: create{" "}
+            <Link href="/finance/leave/types" className="text-amber-500 hover:text-amber-400">
+              leave types
+            </Link>{" "}
+            and policies first, then process requests and balances.
           </p>
           <ul className="space-y-2 text-sm">
             {LINKS.map((l) => (

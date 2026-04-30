@@ -36,6 +36,9 @@ export default async function Page() {
     >
       {workspace && !loadError && (
         <>
+          <div className="inline-flex items-center rounded-full border border-amber-700/40 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+            Workflow Shell: KPI calculation engine deferred
+          </div>
           <KpiDefinitionForm workspace={workspace} />
           <div>
             <h2 className="text-sm font-medium text-neutral-300 mb-3">KPIs</h2>

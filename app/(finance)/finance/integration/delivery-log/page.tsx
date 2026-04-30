@@ -74,9 +74,9 @@ export default async function Page({
       <div className="max-w-5xl space-y-6">
         <div>
           <h1 className="wf-page-title">API idempotency & webhook delivery</h1>
-          <p className="text-sm text-neutral-500 mt-1">Pack 022 — Diagnostics tables</p>
+          <p className="text-sm text-neutral-500 mt-1">Pack 022 — Diagnostics tables (Pack 023 permission bridge)</p>
         </div>
-        <ModuleWorkspaceStatus packNumber={23} workspaceName="Integration" />
+        <ModuleWorkspaceStatus packNumber={22} workspaceName="Integration diagnostics" />
         <GlSetupRequired />
       </div>
     );
@@ -152,9 +152,9 @@ export default async function Page({
   return (
     <WorkflowPageFrame
       title="API idempotency & webhook delivery"
-      moduleLine="Pack 022 — Tenant-scoped idempotency cache and outbound webhook attempt log (operator test rows + future automation)."
-      packNumber={23}
-      workspaceName="Integration"
+      moduleLine="Pack 022 diagnostics with Pack 023 workflow permission bridge. Tenant-scoped idempotency cache and outbound webhook attempt log."
+      packNumber={22}
+      workspaceName="Integration diagnostics"
       workspace={workspace}
       loadError={loadError}
     >
@@ -163,7 +163,11 @@ export default async function Page({
         <Link href="/finance/integration" className="text-amber-500 hover:text-amber-400">
           Integration hub
         </Link>
-        .
+        . Use{" "}
+        <Link href="/finance/integration/pipeline" className="text-amber-500 hover:text-amber-400">
+          event pipeline
+        </Link>{" "}
+        when diagnostics tables are empty.
       </p>
 
       <FinanceIntegrationDeliveryForms workspace={workspace} />

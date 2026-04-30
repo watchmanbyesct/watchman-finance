@@ -24,7 +24,7 @@ export default async function Page() {
   return (
     <WorkflowPageFrame
       title="Pack 008 — Inventory & assets"
-      moduleLine="Migration pack 008: catalog-style inventory master, stock balances, issues to people, and equipment assets."
+      moduleLine="Pack 008 foundation: inventory master data, stock balances, employee issues, and equipment assets."
       packNumber={8}
       workspaceName="Inventory & Assets"
       workspace={workspace}
@@ -34,6 +34,13 @@ export default async function Page() {
           <p className="text-sm text-neutral-400 leading-relaxed">
             Set up locations and items first, then receive stock, record issues, and register serialized or tagged
             equipment. Full receipt documents and transfers can extend these flows later.
+          </p>
+          <p className="text-xs text-neutral-500">
+            Start here: complete{" "}
+            <Link href="/finance/inventory/items" className="text-amber-500 hover:text-amber-400">
+              master data
+            </Link>{" "}
+            first, then move into stock balances, issues, and assets.
           </p>
           <ul className="space-y-2 text-sm">
             {LINKS.map((l) => (

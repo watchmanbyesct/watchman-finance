@@ -17,6 +17,11 @@ import {
 import { AccountsTable } from "@/components/finance/gl/accounts-table";
 import { AccountSeedButton } from "@/components/finance/gl/account-seed-button";
 
+function fmtTaxonomy(value: string | null | undefined): string {
+  if (!value) return "—";
+  return value.replaceAll("_", " ");
+}
+
 export const metadata = { title: "Chart of Accounts — Watchman Finance" };
 
 export default async function Page() {
@@ -69,6 +74,38 @@ export default async function Page() {
           <IntegrationAccountCategorySeedButton workspace={workspace} />
           <CreateAccountCategoryForm workspace={workspace} />
           <AccountCreateForm workspace={workspace} categories={categories} />
+
+          <div>
+            <h2 className="text-sm font-medium text-neutral-300 mb-3">Account categories</h2>
+            {!categories.length ? (
+              <p className="text-sm text-neutral-500 py-4">No active categories found. Use "Seed integration categories" above.</p>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-white/10 mb-6">
+                <table className="w-full text-sm text-left">
+                  <thead className="bg-white/[0.04] text-xs uppercase tracking-wide text-neutral-500">
+                    <tr>
+                      <th className="px-4 py-3 font-medium">Code</th>
+                      <th className="px-4 py-3 font-medium">Name</th>
+                      <th className="px-4 py-3 font-medium">Type</th>
+                      <th className="px-4 py-3 font-medium">Normal</th>
+                      <th className="px-4 py-3 font-medium">Integration taxonomy</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/8 text-neutral-300">
+                    {categories.map((c) => (
+                      <tr key={c.id}>
+                        <td className="px-4 py-2.5 font-mono text-xs text-amber-500/90">{c.code}</td>
+                        <td className="px-4 py-2.5">{c.name}</td>
+                        <td className="px-4 py-2.5">{c.category_type}</td>
+                        <td className="px-4 py-2.5">{c.normal_balance}</td>
+                        <td className="px-4 py-2.5 text-xs text-neutral-400">{fmtTaxonomy(c.integration_account_type)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
 
           <div>
             <h2 className="text-sm font-medium text-neutral-300 mb-3">Accounts</h2>

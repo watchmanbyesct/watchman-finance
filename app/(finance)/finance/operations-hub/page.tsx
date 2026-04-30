@@ -42,9 +42,23 @@ export default async function Page() {
     >
       {workspace && (
         <div className="wf-card space-y-4">
+          <div className="inline-flex items-center rounded-full border border-amber-700/40 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+            Workflow Shell: automation and runbooks in progress
+          </div>
           <p className="text-sm text-neutral-400 leading-relaxed">
             Server actions require <code className="text-xs text-neutral-300">operations.qa.manage</code> and the{" "}
             <code className="text-xs text-neutral-300">operations</code> module entitlement.
+          </p>
+          <p className="text-xs text-neutral-500">
+            Start with{" "}
+            <Link href="/finance/operations/health" className="text-amber-500 hover:text-amber-400">
+              health checks
+            </Link>{" "}
+            and{" "}
+            <Link href="/finance/operations/test-suites" className="text-amber-500 hover:text-amber-400">
+              test suites
+            </Link>{" "}
+            if this workspace is empty, then move into releases and jobs.
           </p>
           <ul className="space-y-2 text-sm">
             {LINKS.map((l) => (

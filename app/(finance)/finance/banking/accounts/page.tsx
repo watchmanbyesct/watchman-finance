@@ -9,6 +9,7 @@ import { WorkflowDataTable } from "@/components/finance/workflow-data-table";
 import { BankAccountCreateForm, BankAccountSeedButton } from "@/components/finance/connected/banking-forms";
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import { listBankAccountsForEntity } from "@/lib/finance/read-queries";
+import Link from "next/link";
 
 export const metadata = { title: "Bank accounts — Watchman Finance" };
 
@@ -36,6 +37,9 @@ export default async function Page() {
     >
       {workspace && !loadError && (
         <>
+          <p className="text-xs text-neutral-500">
+            Requires `banking.account.manage`. Add at least one operating account before loading transactions or reconciliations.
+          </p>
           <BankAccountSeedButton workspace={workspace} />
           <BankAccountCreateForm workspace={workspace} />
           <div>
@@ -49,7 +53,15 @@ export default async function Page() {
                 { key: "is_active", label: "Active" },
               ]}
               rows={rows}
+              emptyMessage="No bank accounts yet. Use seed or create account above to begin banking workflows."
             />
+            <p className="mt-2 text-xs text-neutral-500">
+              Next step:{" "}
+              <Link href="/finance/banking/transactions" className="text-amber-500 hover:text-amber-400">
+                load transactions
+              </Link>
+              .
+            </p>
           </div>
         </>
       )}

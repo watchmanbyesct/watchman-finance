@@ -25,7 +25,7 @@ export default async function Page() {
           <h1 className="wf-page-title">Approval requests</h1>
           <p className="text-sm text-neutral-500 mt-1">Pack 020 — Cross-module approval shell</p>
         </div>
-        <ModuleWorkspaceStatus packNumber={23} workspaceName="Finance approvals" />
+        <ModuleWorkspaceStatus packNumber={20} workspaceName="Finance approvals" />
         <GlSetupRequired />
       </div>
     );
@@ -42,18 +42,21 @@ export default async function Page() {
   return (
     <WorkflowPageFrame
       title="Approval requests"
-      moduleLine="Pack 020 — Draft, submit, and resolve generic approval rows for any finance subject (table + UUID)."
-      packNumber={23}
+      moduleLine="Pack 020 approval workflow with Pack 023 permission bridge. Draft, submit, and resolve generic approval rows for any finance subject."
+      packNumber={20}
       workspaceName="Finance approvals"
       workspace={workspace}
       loadError={loadError}
     >
+      <div className="inline-flex items-center rounded-full border border-amber-700/40 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+        Workflow Shell: escalation automation deferred
+      </div>
       <p className="text-sm text-neutral-500">
         Copy an <code className="text-xs text-neutral-400">id</code> from the table into the submit or resolve forms.{" "}
         <Link href="/finance/evidence" className="text-amber-500 hover:text-amber-400">
           Evidence documents
         </Link>
-        .
+        . Start by creating a draft request, then submit it and resolve it after review.
       </p>
 
       <FinanceApprovalWorkflowForms workspace={workspace} />

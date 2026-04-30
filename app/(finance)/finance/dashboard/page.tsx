@@ -202,7 +202,7 @@ function buildSetupChecklist(
       href: "/finance/evidence",
     },
     {
-      label: "Pack 024 — External accounting OAuth (Pack 002 extension)",
+      label: "Pack 024 — External accounting OAuth integration",
       complete: PACK >= 24,
       href: "/finance/integration/accounting-oauth",
     },
@@ -212,7 +212,7 @@ function buildSetupChecklist(
       href: "/finance/accounts",
     },
     {
-      label: "Pack 026 — Desktop payroll components (items, assignments, liabilities)",
+      label: "Pack 026 — Payroll desktop components (items, assignments, liabilities)",
       complete: PACK >= 26,
       href: "/finance/payroll/desktop",
     },
@@ -222,7 +222,7 @@ function buildSetupChecklist(
       href: "/finance/accounts",
     },
     {
-      label: "Pack 028 — Neutral integration naming (DB columns + OAuth tables)",
+      label: "Pack 028 — Neutral integration naming",
       complete: PACK >= 28,
       href: "/finance/accounts",
     },

@@ -13,6 +13,7 @@ import {
   listInvoicePaymentsForEntity,
   listInvoicesForEntity,
 } from "@/lib/finance/read-queries";
+import Link from "next/link";
 
 export const metadata = { title: "AR Payments — Watchman Finance" };
 
@@ -49,6 +50,9 @@ export default async function Page() {
     >
       {workspace && !loadError && (
         <>
+          <p className="text-xs text-neutral-500">
+            Requires `ar.payment.record`. Customer payment application works best after invoices are issued.
+          </p>
           <RecordPaymentForm workspace={workspace} customers={customers} invoices={invoices} />
           <div>
             <h2 className="text-sm font-medium text-neutral-300 mb-3">Payment history</h2>
@@ -61,7 +65,15 @@ export default async function Page() {
                 { key: "payment_status", label: "Status" },
               ]}
               rows={rows}
+              emptyMessage="No customer payments yet. Record a payment above against an issued invoice."
             />
+            <p className="mt-2 text-xs text-neutral-500">
+              Setup link:{" "}
+              <Link href="/finance/ar/invoices" className="text-amber-500 hover:text-amber-400">
+                invoices
+              </Link>
+              .
+            </p>
           </div>
         </>
       )}

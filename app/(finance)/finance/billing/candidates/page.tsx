@@ -10,6 +10,7 @@ import { BillableCandidateForm } from "@/components/finance/connected/catalog-bi
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import { getCatalogBillingPack013Flags } from "@/lib/finance/catalog-billing-pack013-flags";
 import { listBillableCandidatesForTenant } from "@/lib/finance/read-queries";
+import Link from "next/link";
 
 export const metadata = { title: "Billable candidates — Watchman Finance" };
 
@@ -38,6 +39,9 @@ export default async function Page() {
     >
       {workspace && !loadError && p13 && (
         <>
+          <p className="text-xs text-neutral-500">
+            Requires `billing.candidate.manage` and `billing` module entitlement. Candidate sources typically come from integration/staging workflows.
+          </p>
           <BillableCandidateForm workspace={workspace} canManage={p13.canManageCandidates} />
           <div>
             <h2 className="text-sm font-medium text-neutral-300 mb-3">Candidates</h2>
@@ -50,7 +54,19 @@ export default async function Page() {
                 { key: "quantity", label: "Qty" },
               ]}
               rows={rows}
+              emptyMessage="No billable candidates yet. Create one above or verify integration staging inputs."
             />
+            <p className="mt-2 text-xs text-neutral-500">
+              Source links:{" "}
+              <Link href="/finance/integration/staging/service-events" className="text-amber-500 hover:text-amber-400">
+                service events staging
+              </Link>{" "}
+              ·{" "}
+              <Link href="/finance/integration/pipeline" className="text-amber-500 hover:text-amber-400">
+                integration pipeline
+              </Link>
+              .
+            </p>
           </div>
         </>
       )}

@@ -10,6 +10,7 @@ import { BillingExceptionResolveForm } from "@/components/finance/connected/cata
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import { getCatalogBillingPack013Flags } from "@/lib/finance/catalog-billing-pack013-flags";
 import { listBillingExceptionEventsForTenant } from "@/lib/finance/read-queries";
+import Link from "next/link";
 
 export const metadata = { title: "Billing exceptions — Watchman Finance" };
 
@@ -41,6 +42,9 @@ export default async function Page() {
     >
       {workspace && !loadError && p13 && (
         <div className="space-y-6">
+          <p className="text-xs text-neutral-500">
+            Resolving exceptions requires `billing.rule.manage` and `billing` module entitlement.
+          </p>
           <BillingExceptionResolveForm
             workspace={workspace}
             openExceptions={openForForm}
@@ -58,7 +62,19 @@ export default async function Page() {
               { key: "created_at", label: "Created" },
             ]}
             rows={rows}
+            emptyMessage="No billing exceptions yet. Exceptions appear when candidate/rule processing fails validation."
           />
+          <p className="text-xs text-neutral-500">
+            Check upstream flows:{" "}
+            <Link href="/finance/billing/candidates" className="text-amber-500 hover:text-amber-400">
+              billable candidates
+            </Link>{" "}
+            and{" "}
+            <Link href="/finance/integration/pipeline" className="text-amber-500 hover:text-amber-400">
+              integration pipeline
+            </Link>
+            .
+          </p>
         </div>
       )}
     </WorkflowPageFrame>

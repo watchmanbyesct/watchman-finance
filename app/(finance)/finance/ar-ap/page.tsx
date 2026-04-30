@@ -31,7 +31,7 @@ export default async function Page() {
   return (
     <WorkflowPageFrame
       title="Pack 003 — Accounts receivable & payable"
-      moduleLine="Migration pack 003: customers, vendors, invoices, bills, and payment recording (GL posting deferred)."
+      moduleLine="Pack 003 foundation: customers, vendors, invoices, bills, and payment recording (GL posting automation is handled in later packs)."
       packNumber={3}
       workspaceName="AR & AP"
       workspace={workspace}
@@ -40,7 +40,18 @@ export default async function Page() {
         <div className="wf-card space-y-4">
           <p className="text-sm text-neutral-400 leading-relaxed">
             Each workflow below loads tenant data through read queries and submits through server actions with
-            finance permissions. Start with customers and vendors, then invoices and bills, then payments.
+            finance permissions.
+          </p>
+          <p className="text-xs text-neutral-500">
+            Start here: configure{" "}
+            <Link href="/finance/ar/customers" className="text-amber-500 hover:text-amber-400">
+              customers
+            </Link>{" "}
+            and{" "}
+            <Link href="/finance/ap/vendors" className="text-amber-500 hover:text-amber-400">
+              vendors
+            </Link>
+            , then move to invoices/bills and finally payments.
           </p>
           <ul className="space-y-2 text-sm">
             {LINKS.map((l) => (

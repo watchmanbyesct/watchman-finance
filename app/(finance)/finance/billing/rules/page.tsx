@@ -10,6 +10,7 @@ import { BillingRuleForm } from "@/components/finance/connected/catalog-billing-
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import { getCatalogBillingPack013Flags } from "@/lib/finance/catalog-billing-pack013-flags";
 import { listBillingRulesForTenant } from "@/lib/finance/read-queries";
+import Link from "next/link";
 
 export const metadata = { title: "Billing rules — Watchman Finance" };
 
@@ -38,6 +39,9 @@ export default async function Page() {
     >
       {workspace && !loadError && p13 && (
         <>
+          <p className="text-xs text-neutral-500">
+            Requires `billing.rule.manage` and `billing` module entitlement. Configure catalog items/prices first for cleaner rule setup.
+          </p>
           <BillingRuleForm workspace={workspace} canManage={p13.canManageBillingRules} />
           <div>
             <h2 className="text-sm font-medium text-neutral-300 mb-3">Rules</h2>
@@ -50,7 +54,19 @@ export default async function Page() {
                 { key: "status", label: "Status" },
               ]}
               rows={rows}
+              emptyMessage="No billing rules yet. Create a rule above to begin billing automation."
             />
+            <p className="mt-2 text-xs text-neutral-500">
+              Setup links:{" "}
+              <Link href="/finance/catalog/items" className="text-amber-500 hover:text-amber-400">
+                catalog items
+              </Link>{" "}
+              ·{" "}
+              <Link href="/finance/catalog/pricing" className="text-amber-500 hover:text-amber-400">
+                catalog pricing
+              </Link>
+              .
+            </p>
           </div>
         </>
       )}

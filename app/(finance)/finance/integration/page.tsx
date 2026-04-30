@@ -29,7 +29,7 @@ export default async function Page() {
   return (
     <WorkflowPageFrame
       title="Pack 002 — Integration & organization"
-      moduleLine="Migration pack 002: staging tables, integration event log, and org structure (branches, departments, locations)."
+      moduleLine="Pack 002 foundation: staging tables, integration event log, and tenant org structure (branches, departments, locations)."
       packNumber={2}
       workspaceName="Integration & staging"
       workspace={workspace}
@@ -40,6 +40,13 @@ export default async function Page() {
             Use the links below to manage integration staging and tenant org data. API ingress continues to use{" "}
             <code className="text-xs text-neutral-300">/api/integrations/*</code> with the integration secret; these
             pages are for authenticated operators with the right permissions.
+          </p>
+          <p className="text-xs text-neutral-500">
+            Start here: confirm{" "}
+            <Link href="/finance/integration/org/branches" className="text-amber-500 hover:text-amber-400">
+              branch/org setup
+            </Link>{" "}
+            first, then review staging rows, and finally monitor pipeline diagnostics.
           </p>
           <ul className="space-y-2 text-sm">
             {LINKS.map((l) => (

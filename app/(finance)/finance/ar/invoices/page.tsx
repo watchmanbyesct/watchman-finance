@@ -10,6 +10,7 @@ import { InvoiceDraftForm } from "@/components/finance/connected/ar-forms";
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import { listCustomersForTenant, listInvoicesForEntity } from "@/lib/finance/read-queries";
 import { getAccountsByEntity } from "@/modules/finance-core/repositories/finance-core-repository";
+import Link from "next/link";
 
 export const metadata = { title: "Invoices — Watchman Finance" };
 
@@ -51,6 +52,9 @@ export default async function Page() {
     >
       {workspace && !loadError && (
         <>
+          <p className="text-xs text-neutral-500">
+            Requires `ar.invoice.manage`. Ensure at least one customer and one revenue account exist before drafting invoices.
+          </p>
           <InvoiceDraftForm workspace={workspace} customers={customers} revenueAccounts={revenueAccounts} />
           <div>
             <h2 className="text-sm font-medium text-neutral-300 mb-3">Open invoices</h2>
@@ -63,7 +67,19 @@ export default async function Page() {
                 { key: "balance_due", label: "Balance" },
               ]}
               rows={rows}
+              emptyMessage="No invoices yet. Create an invoice draft above after customer and account setup."
             />
+            <p className="mt-2 text-xs text-neutral-500">
+              Setup links:{" "}
+              <Link href="/finance/ar/customers" className="text-amber-500 hover:text-amber-400">
+                customers
+              </Link>{" "}
+              ·{" "}
+              <Link href="/finance/accounts" className="text-amber-500 hover:text-amber-400">
+                chart of accounts
+              </Link>
+              .
+            </p>
           </div>
         </>
       )}

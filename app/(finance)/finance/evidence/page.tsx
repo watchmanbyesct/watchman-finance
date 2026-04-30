@@ -23,9 +23,9 @@ export default async function Page() {
       <div className="max-w-5xl space-y-6">
         <div>
           <h1 className="wf-page-title">Evidence documents</h1>
-          <p className="text-sm text-neutral-500 mt-1">Pack 019 — Finance evidence metadata</p>
+          <p className="text-sm text-neutral-500 mt-1">Pack 019 — Finance evidence metadata (Pack 023 permission bridge)</p>
         </div>
-        <ModuleWorkspaceStatus packNumber={23} workspaceName="Finance evidence" />
+        <ModuleWorkspaceStatus packNumber={19} workspaceName="Finance evidence" />
         <GlSetupRequired />
       </div>
     );
@@ -42,18 +42,21 @@ export default async function Page() {
   return (
     <WorkflowPageFrame
       title="Evidence documents"
-      moduleLine="Pack 019 — Register storage paths and metadata for supporting documents tied to finance records."
-      packNumber={23}
+      moduleLine="Pack 019 evidence registry with Pack 023 workflow permission bridge. Register storage paths and metadata tied to finance records."
+      packNumber={19}
       workspaceName="Finance evidence"
       workspace={workspace}
       loadError={loadError}
     >
+      <div className="inline-flex items-center rounded-full border border-amber-700/40 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+        Workflow Shell: file storage lifecycle handled externally
+      </div>
       <p className="text-sm text-neutral-500">
         Upload files to your object store first, then register the bucket and path here. Related:{" "}
         <Link href="/finance/approvals" className="text-amber-500 hover:text-amber-400">
           Approval requests
         </Link>
-        .
+        . If this table is empty, create a row after uploading a document and validating the parent record id.
       </p>
 
       <FinanceEvidenceWorkflowForm workspace={workspace} />

@@ -9,6 +9,7 @@ import { WorkflowDataTable } from "@/components/finance/workflow-data-table";
 import { VendorCreateForm } from "@/components/finance/connected/ap-forms";
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import { listVendorsForTenant } from "@/lib/finance/read-queries";
+import Link from "next/link";
 
 export const metadata = { title: "Vendors — Watchman Finance" };
 
@@ -36,6 +37,9 @@ export default async function Page() {
     >
       {workspace && !loadError && (
         <>
+          <p className="text-xs text-neutral-500">
+            Requires `ap.vendor.manage` to create rows. If bill entry is blocked, confirm at least one vendor exists first.
+          </p>
           <VendorCreateForm workspace={workspace} />
           <div>
             <h2 className="text-sm font-medium text-neutral-300 mb-3">Vendor directory</h2>
@@ -46,7 +50,15 @@ export default async function Page() {
                 { key: "legal_name", label: "Legal name" },
               ]}
               rows={rows}
+              emptyMessage="No vendors yet. Create a vendor above, then continue to `Bills`."
             />
+            <p className="mt-2 text-xs text-neutral-500">
+              Next step:{" "}
+              <Link href="/finance/ap/bills" className="text-amber-500 hover:text-amber-400">
+                enter AP bills
+              </Link>
+              .
+            </p>
           </div>
         </>
       )}

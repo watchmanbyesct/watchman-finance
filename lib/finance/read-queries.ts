@@ -1285,3 +1285,129 @@ export async function listFinanceWebhookDeliveryLogForTenant(tenantId: string) {
     .limit(120);
   return q(data, error);
 }
+
+export async function listFinanceCostProfilesForTenant(tenantId: string) {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("finance_cost_profiles")
+    .select(
+      "id, name, is_default, payroll_tax_rate, workers_comp_rate, overhead_rate, target_margin, minimum_margin, updated_at"
+    )
+    .eq("tenant_id", tenantId)
+    .order("is_default", { ascending: false })
+    .order("name");
+  return q(data, error);
+}
+
+export async function listFinanceEstimatesForEntity(tenantId: string, entityId: string) {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("finance_estimates")
+    .select(
+      "id, estimate_number, title, stage, status, total_revenue, total_cost, gross_profit, margin_percent, approval_status, sent_at, won_at, lost_at, created_at"
+    )
+    .eq("tenant_id", tenantId)
+    .eq("entity_id", entityId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  return q(data, error);
+}
+
+export async function listFinanceProposalsForTenant(tenantId: string) {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("finance_proposals")
+    .select("id, estimate_id, proposal_number, status, sent_to, sent_at, viewed_at, accepted_at, declined_at, created_at")
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  return q(data, error);
+}
+
+export async function listFinanceDealOutcomesForTenant(tenantId: string) {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("finance_deal_outcomes")
+    .select("id, estimate_id, outcome, outcome_reason, final_value, final_margin, decided_at, notes")
+    .eq("tenant_id", tenantId)
+    .order("decided_at", { ascending: false })
+    .limit(200);
+  return q(data, error);
+}
+
+export async function listFinanceEstimateApprovalsForTenant(tenantId: string) {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("finance_estimate_approvals")
+    .select("id, estimate_id, approval_rule, required_role, status, requested_at, approved_at, rejected_at, comments")
+    .eq("tenant_id", tenantId)
+    .order("requested_at", { ascending: false })
+    .limit(200);
+  return q(data, error);
+}
+
+export async function listFinancePricingTemplatesForTenant(tenantId: string) {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("finance_pricing_templates")
+    .select("id, template_name, service_type, personnel_type, default_margin, active_flag")
+    .eq("tenant_id", tenantId)
+    .order("template_name");
+  return q(data, error);
+}
+
+export async function listFinanceContractProfitAuditsForTenant(tenantId: string) {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("finance_contract_profit_audits")
+    .select(
+      "id, estimate_id, contract_id, period_start, period_end, estimated_revenue, actual_revenue, estimated_cost, actual_cost, estimated_margin, actual_margin, margin_variance, risk_level, recommended_action, created_at"
+    )
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false })
+    .limit(200);
+  return q(data, error);
+}
+
+export async function listFinanceRenewalRecommendationsForTenant(tenantId: string) {
+  const supabase = createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("finance_contract_renewal_recommendations")
+    .select(
+      "id, estimate_id, contract_anniversary_date, current_bill_rate, wage_increase_rate, insurance_increase_rate, overtime_trend_rate, inflation_rate, recommended_escalation_rate, recommended_bill_rate, rationale, created_at"
+    )
+    .eq("tenant_id", tenantId)
+    .order("contract_anniversary_date", { ascending: true })
+    .limit(200);
+  return q(data, error);
+}
+
+export type FinanceEstimatesDashboardMetrics = {
+  totalPipelineValue: number;
+  wonValue: number;
+  lostValue: number;
+  averageMargin: number;
+  winRatio: number;
+};
+
+export async function getFinanceEstimatesDashboardMetrics(
+  tenantId: string,
+  entityId: string,
+): Promise<FinanceEstimatesDashboardMetrics> {
+  const estimates = await listFinanceEstimatesForEntity(tenantId, entityId);
+  const pipelineRows = estimates.filter((row) => row.stage !== "lost" && row.stage !== "expired");
+  const wonRows = estimates.filter((row) => row.stage === "won");
+  const lostRows = estimates.filter((row) => row.stage === "lost");
+
+  const totalPipelineValue = pipelineRows.reduce((sum, row) => sum + Number(row.total_revenue ?? 0), 0);
+  const wonValue = wonRows.reduce((sum, row) => sum + Number(row.total_revenue ?? 0), 0);
+  const lostValue = lostRows.reduce((sum, row) => sum + Number(row.total_revenue ?? 0), 0);
+  const averageMargin =
+    estimates.length > 0
+      ? estimates.reduce((sum, row) => sum + Number(row.margin_percent ?? 0), 0) / estimates.length
+      : 0;
+  const decisionCount = wonRows.length + lostRows.length;
+  const winRatio = decisionCount > 0 ? wonRows.length / decisionCount : 0;
+
+  return { totalPipelineValue, wonValue, lostValue, averageMargin, winRatio };
+}

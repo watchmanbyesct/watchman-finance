@@ -44,6 +44,9 @@ export default async function Page() {
     >
       {workspace && !loadError && (
         <>
+          <div className="inline-flex items-center rounded-full border border-amber-700/40 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+            Workflow Shell: report distribution automation deferred
+          </div>
           <ReportSnapshotAutomationForm
             workspace={workspace}
             definitions={rows as { id: string; report_code: string; report_name: string }[]}

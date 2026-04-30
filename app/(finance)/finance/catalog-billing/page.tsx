@@ -66,7 +66,7 @@ export default async function Page() {
   return (
     <WorkflowPageFrame
       title="Pack 007 — Catalog & contract billing"
-      moduleLine="Migration pack 007: sellable catalog, prices, billing rules, billable candidates, and exception events. Pack 013 adds granular permissions and module entitlements (catalog, billing)."
+      moduleLine="Pack 007 foundation: sellable catalog, prices, billing rules, billable candidates, and exception events. Pack 013 adds granular permissions and module entitlements."
       packNumber={7}
       workspaceName="Catalog & billing"
       workspace={workspace}
@@ -94,6 +94,9 @@ export default async function Page() {
               </Link>{" "}
               permission codes and the <strong>catalog</strong> / <strong>billing</strong> module flags on your
               tenant.
+            </p>
+            <p className="text-xs text-neutral-500">
+              Start here: seed categories/items, then set pricing, then configure billing rules before reviewing candidates/exceptions.
             </p>
             <ul className="space-y-2 text-sm">
               <li>

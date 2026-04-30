@@ -9,6 +9,7 @@ import { WorkflowDataTable } from "@/components/finance/workflow-data-table";
 import { ReconciliationCreateForm, ReconciliationLifecycleForm } from "@/components/finance/connected/banking-forms";
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import { listBankAccountsForEntity, listReconciliationsForEntity } from "@/lib/finance/read-queries";
+import Link from "next/link";
 
 export const metadata = { title: "Reconciliations — Watchman Finance" };
 
@@ -42,6 +43,9 @@ export default async function Page() {
     >
       {workspace && !loadError && (
         <>
+          <p className="text-xs text-neutral-500">
+            Requires `banking.reconciliation.manage`. Start with at least one active bank account and loaded transaction activity.
+          </p>
           <ReconciliationCreateForm workspace={workspace} bankAccounts={accounts} />
           <ReconciliationLifecycleForm
             workspace={workspace}
@@ -62,7 +66,19 @@ export default async function Page() {
                 { key: "statement_ending_balance", label: "Stmt balance" },
               ]}
               rows={rows}
+              emptyMessage="No reconciliation sessions yet. Create one above after account and transaction setup."
             />
+            <p className="mt-2 text-xs text-neutral-500">
+              Setup links:{" "}
+              <Link href="/finance/banking/accounts" className="text-amber-500 hover:text-amber-400">
+                bank accounts
+              </Link>{" "}
+              ·{" "}
+              <Link href="/finance/banking/transactions" className="text-amber-500 hover:text-amber-400">
+                transactions
+              </Link>
+              .
+            </p>
           </div>
         </>
       )}

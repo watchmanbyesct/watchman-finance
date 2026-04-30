@@ -9,6 +9,7 @@ import { WorkflowDataTable } from "@/components/finance/workflow-data-table";
 import { CustomerCreateForm } from "@/components/finance/connected/ar-forms";
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import { listCustomersForTenant } from "@/lib/finance/read-queries";
+import Link from "next/link";
 
 export const metadata = { title: "Customers — Watchman Finance" };
 
@@ -36,6 +37,9 @@ export default async function Page() {
     >
       {workspace && !loadError && (
         <>
+          <p className="text-xs text-neutral-500">
+            Requires `ar.customer.manage` to create rows. If customer sites are empty later, add at least one customer here first.
+          </p>
           <CustomerCreateForm workspace={workspace} />
           <div>
             <h2 className="text-sm font-medium text-neutral-300 mb-3">Directory</h2>
@@ -47,7 +51,15 @@ export default async function Page() {
                 { key: "payment_terms_days", label: "Terms (days)" },
               ]}
               rows={rows}
+              emptyMessage="No customers yet. Create a customer above, then continue to `Customer sites`."
             />
+            <p className="mt-2 text-xs text-neutral-500">
+              Next step:{" "}
+              <Link href="/finance/ar/customer-sites" className="text-amber-500 hover:text-amber-400">
+                set up customer sites
+              </Link>
+              .
+            </p>
           </div>
         </>
       )}

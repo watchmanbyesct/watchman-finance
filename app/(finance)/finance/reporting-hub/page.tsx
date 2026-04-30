@@ -32,6 +32,9 @@ export default async function Page() {
     >
       {workspace && (
         <div className="wf-card space-y-4">
+          <div className="inline-flex items-center rounded-full border border-amber-700/40 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+            Workflow Shell: snapshot/task automation deferred
+          </div>
           <p className="text-sm text-neutral-400 leading-relaxed">
             Register definitions with permissions on <code className="text-xs text-neutral-300">reporting.definition.manage</code>
             , then use period close to track entity-scoped checklist drafts.

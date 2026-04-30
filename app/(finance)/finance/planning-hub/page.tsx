@@ -30,10 +30,24 @@ export default async function Page() {
     >
       {workspace && (
         <div className="wf-card space-y-4">
+          <div className="inline-flex items-center rounded-full border border-amber-700/40 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-300">
+            Workflow Shell: advanced variance automation deferred
+          </div>
           <p className="text-sm text-neutral-400 leading-relaxed">
             Use <code className="text-xs text-neutral-300">planning.budget.manage</code> and{" "}
             <code className="text-xs text-neutral-300">planning.forecast.manage</code> to create versions, lines, and
             variance snapshot rows for this entity.
+          </p>
+          <p className="text-xs text-neutral-500">
+            If no versions exist yet, start with{" "}
+            <Link href="/finance/planning/budgets" className="text-amber-500 hover:text-amber-400">
+              budgets
+            </Link>{" "}
+            then add{" "}
+            <Link href="/finance/planning/forecasts" className="text-amber-500 hover:text-amber-400">
+              forecasts
+            </Link>{" "}
+            before opening variance snapshots.
           </p>
           <ul className="space-y-2 text-sm">
             {LINKS.map((l) => (

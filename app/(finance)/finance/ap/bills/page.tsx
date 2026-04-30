@@ -9,6 +9,7 @@ import { WorkflowDataTable } from "@/components/finance/workflow-data-table";
 import { BillDraftForm } from "@/components/finance/connected/ap-forms";
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import { listBillsForEntity, listVendorsForTenant } from "@/lib/finance/read-queries";
+import Link from "next/link";
 
 export const metadata = { title: "Bills — Watchman Finance" };
 
@@ -42,6 +43,9 @@ export default async function Page() {
     >
       {workspace && !loadError && (
         <>
+          <p className="text-xs text-neutral-500">
+            Requires `ap.bill.manage`. Ensure at least one vendor exists before drafting bills.
+          </p>
           <BillDraftForm workspace={workspace} vendors={vendors} />
           <div>
             <h2 className="text-sm font-medium text-neutral-300 mb-3">Bills</h2>
@@ -54,7 +58,15 @@ export default async function Page() {
                 { key: "balance_due", label: "Balance" },
               ]}
               rows={rows}
+              emptyMessage="No bills yet. Create a bill draft above after vendor setup."
             />
+            <p className="mt-2 text-xs text-neutral-500">
+              Setup link:{" "}
+              <Link href="/finance/ap/vendors" className="text-amber-500 hover:text-amber-400">
+                vendor directory
+              </Link>
+              .
+            </p>
           </div>
         </>
       )}

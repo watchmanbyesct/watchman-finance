@@ -10,6 +10,7 @@ import { CatalogPriceForm } from "@/components/finance/connected/catalog-billing
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import { getCatalogBillingPack013Flags } from "@/lib/finance/catalog-billing-pack013-flags";
 import { listCatalogItemPricesForTenant, listCatalogItemsForTenant } from "@/lib/finance/read-queries";
+import Link from "next/link";
 
 export const metadata = { title: "Catalog pricing — Watchman Finance" };
 
@@ -44,6 +45,9 @@ export default async function Page() {
     >
       {workspace && !loadError && p13 && (
         <>
+          <p className="text-xs text-neutral-500">
+            Requires `catalog.price.manage` and `catalog` module entitlement. Create catalog items first if pricing options are empty.
+          </p>
           <CatalogPriceForm
             workspace={workspace}
             catalogItems={catalogItems}
@@ -60,7 +64,15 @@ export default async function Page() {
                 { key: "catalog_item_id", label: "Item id" },
               ]}
               rows={prices}
+              emptyMessage="No price rows yet. Create a price row above after catalog item setup."
             />
+            <p className="mt-2 text-xs text-neutral-500">
+              Setup link:{" "}
+              <Link href="/finance/catalog/items" className="text-amber-500 hover:text-amber-400">
+                catalog items
+              </Link>
+              .
+            </p>
           </div>
         </>
       )}

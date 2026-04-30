@@ -9,6 +9,7 @@ import { WorkflowDataTable } from "@/components/finance/workflow-data-table";
 import { PayrollRunCreateForm, PayrollRunLifecycleForm } from "@/components/finance/connected/payroll-forms";
 import { resolveFinanceWorkspace } from "@/lib/context/resolve-finance-workspace";
 import { listPayGroupsForEntity, listPayPeriodsForEntity, listPayrollRunsForEntity } from "@/lib/finance/read-queries";
+import Link from "next/link";
 
 export const metadata = { title: "Payroll runs — Watchman Finance" };
 
@@ -45,6 +46,9 @@ export default async function Page() {
     >
       {workspace && !loadError && (
         <>
+          <p className="text-xs text-neutral-500">
+            Requires `payroll.run.manage`. Ensure pay groups and pay periods are configured before creating a run.
+          </p>
           <PayrollRunCreateForm workspace={workspace} payGroups={groups} payPeriods={periods} />
           <PayrollRunLifecycleForm
             workspace={workspace}
@@ -65,7 +69,19 @@ export default async function Page() {
                 { key: "period_end", label: "Period end" },
               ]}
               rows={rows}
+              emptyMessage="No payroll runs yet. Create a run above after pay groups and periods are set."
             />
+            <p className="mt-2 text-xs text-neutral-500">
+              Setup links:{" "}
+              <Link href="/finance/payroll/groups" className="text-amber-500 hover:text-amber-400">
+                pay groups
+              </Link>{" "}
+              ·{" "}
+              <Link href="/finance/payroll/periods" className="text-amber-500 hover:text-amber-400">
+                pay periods
+              </Link>
+              .
+            </p>
           </div>
         </>
       )}
