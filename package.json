@@ -7,6 +7,7 @@
     "contracts:check": "node ./scripts/check-contracts.mjs",
     "synthetic:check": "node ./scripts/synthetic-flow-check.mjs",
     "synthetic:live": "node ./scripts/synthetic-live-probe.mjs",
+    "smoke:tenant": "node ./scripts/smoke-tenant-workspace.mjs",
     "build": "npm run contracts:check && npm run synthetic:check && next build",
     "start": "next start",
     "lint": "next lint",
