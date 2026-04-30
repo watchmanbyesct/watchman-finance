@@ -7,16 +7,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyIntegrationRequest, integrationErrorResponse } from "@/lib/auth/verify-integration-request";
 import { createSupabaseAdminClient } from "@/lib/db/supabase-server";
+import { normalizeEmployeePayloadForStaging } from "@/lib/integration/employee-event-normalize";
 import crypto from "crypto";
 
 /**
  * POST /api/integrations/launch/employees
  *
- * Receives employee records from Watchman Launch and stages them
- * in staged_employees for validation and promotion to finance_people.
+ * Stages employee lifecycle payloads for Finance (Launch v1 and HR v2 coexistence).
+ * `normalized_json` is a unified projection for downstream promotion logic.
  *
- * Called by Launch on: hire, update, termination, reactivation.
- * Idempotent: uses source_record_id + payload hash as dedupe key.
+ * Idempotent: uses tenant_id + dedupe_key (`source_system_key`, source_record_id, payload).
  */
 export async function POST(req: NextRequest) {
   const bodyText = await req.text();
@@ -41,12 +41,15 @@ export async function POST(req: NextRequest) {
   if (schema_version !== "employee.v1" && schema_version !== "employee.v2") {
     return integrationErrorResponse("unsupported_schema_version", 400);
   }
+  const sv = schema_version as "employee.v1" | "employee.v2";
   if (schema_version === "employee.v1" && source_system_key && source_system_key !== "watchman_launch") {
     return integrationErrorResponse("invalid_source_system_key", 400);
   }
   if (schema_version === "employee.v2" && source_system_key !== "watchman_hr") {
     return integrationErrorResponse("invalid_source_system_key", 400);
   }
+
+  const emp = employee && typeof employee === "object" && !Array.isArray(employee) ? (employee as Record<string, unknown>) : {};
 
   const dedupeKey = crypto
     .createHash("sha256")
@@ -55,6 +58,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const admin = createSupabaseAdminClient();
+
+    const normalizedJson = normalizeEmployeePayloadForStaging(sv, emp);
 
     const { data, error } = await admin
       .from("staged_employees")
@@ -66,7 +71,7 @@ export async function POST(req: NextRequest) {
           source_record_id,
           dedupe_key:        dedupeKey,
           payload_json:      employee,
-          normalized_json:   {},
+          normalized_json:   normalizedJson,
           validation_status: "pending",
           correlation_id:    req.headers.get("x-watchman-correlation-id") ?? crypto.randomUUID(),
         },
