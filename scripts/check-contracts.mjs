@@ -10,6 +10,12 @@ const schemas = [
     expectedId: "watchman/contracts/employee-event.v1",
   },
   {
+    file: "contracts/schemas/employee-event.v2.schema.json",
+    requiredTopLevel: ["$id", "$schema", "title", "type", "required", "properties"],
+    requiredPropertyKeys: ["schema_version", "event_type", "event_id", "occurred_at", "tenant_id", "source_system_key", "employee"],
+    expectedId: "watchman/contracts/employee-event.v2",
+  },
+  {
     file: "contracts/schemas/integration-envelope.v1.schema.json",
     requiredTopLevel: ["$id", "$schema", "title", "type", "required", "properties"],
     requiredPropertyKeys: ["tenant_id", "source_record_id"],

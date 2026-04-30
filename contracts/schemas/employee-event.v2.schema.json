@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "watchman/contracts/employee-event.v2",
+  "title": "Watchman Employee Event v2",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "event_type",
+    "event_id",
+    "occurred_at",
+    "tenant_id",
+    "source_system_key",
+    "employee"
+  ],
+  "properties": {
+    "schema_version": { "const": "employee.v2" },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "employee.created",
+        "employee.updated",
+        "employee.status_changed",
+        "employee.terminated"
+      ]
+    },
+    "event_id": { "type": "string", "minLength": 1 },
+    "occurred_at": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "source_system_key": { "type": "string", "const": "watchman_hr" },
+    "employee": {
+      "type": "object",
+      "required": ["employee_id", "first_name", "last_name", "status", "roles"],
+      "properties": {
+        "employee_id": { "type": "string", "minLength": 1 },
+        "auth_id": { "type": ["string", "null"] },
+        "external_ref": { "type": ["string", "null"] },
+        "first_name": { "type": "string", "minLength": 1 },
+        "last_name": { "type": "string", "minLength": 1 },
+        "email": { "type": ["string", "null"] },
+        "phone": { "type": ["string", "null"] },
+        "status": {
+          "type": "string",
+          "enum": ["active", "inactive", "terminated", "leave"]
+        },
+        "hire_date": { "type": ["string", "null"] },
+        "termination_date": { "type": ["string", "null"] },
+        "department": { "type": ["string", "null"] },
+        "position": { "type": ["string", "null"] },
+        "branch_code": { "type": ["string", "null"] },
+        "roles": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "employment": {
+          "type": ["object", "null"],
+          "properties": {
+            "employment_type": {
+              "type": ["string", "null"],
+              "enum": ["full_time", "part_time", "contractor", "temporary", null]
+            },
+            "manager_employee_id": { "type": ["string", "null"] },
+            "work_location_code": { "type": ["string", "null"] }
+          },
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

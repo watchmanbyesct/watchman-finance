@@ -22,6 +22,10 @@ export async function POST(req: NextRequest) {
   const bodyText = await req.text();
   const { valid, reason } = await verifyIntegrationRequest(req, bodyText);
   if (!valid) return integrationErrorResponse(reason ?? "unauthorized");
+  const contractVersion = req.headers.get("x-watchman-contract-version");
+  if (!contractVersion || contractVersion !== "v1") {
+    return integrationErrorResponse("unsupported_contract_version", 400);
+  }
 
   let payload: Record<string, unknown>;
   try {
@@ -38,10 +42,14 @@ export async function POST(req: NextRequest) {
     pay_period_start,
     pay_period_end,
     time_entry,
+    source_system_key,
   } = payload as any;
 
   if (!tenant_id || !source_record_id || !employee_source_record_id || !time_entry) {
     return integrationErrorResponse("missing_required_fields", 400);
+  }
+  if (source_system_key && source_system_key !== "watchman_operations") {
+    return integrationErrorResponse("invalid_source_system_key", 400);
   }
 
   const dedupeKey = crypto

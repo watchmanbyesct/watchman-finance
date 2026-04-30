@@ -22,6 +22,10 @@ export async function POST(req: NextRequest) {
   const bodyText = await req.text();
   const { valid, reason } = await verifyIntegrationRequest(req, bodyText);
   if (!valid) return integrationErrorResponse(reason ?? "unauthorized");
+  const contractVersion = req.headers.get("x-watchman-contract-version");
+  if (!contractVersion || (contractVersion !== "v1" && contractVersion !== "v2")) {
+    return integrationErrorResponse("unsupported_contract_version", 400);
+  }
 
   let payload: Record<string, unknown>;
   try {
@@ -30,14 +34,23 @@ export async function POST(req: NextRequest) {
     return integrationErrorResponse("invalid_json", 400);
   }
 
-  const { tenant_id, entity_id, source_record_id, employee } = payload as any;
+  const { tenant_id, entity_id, source_record_id, employee, schema_version, source_system_key } = payload as any;
   if (!tenant_id || !source_record_id || !employee) {
     return integrationErrorResponse("missing_required_fields", 400);
+  }
+  if (schema_version !== "employee.v1" && schema_version !== "employee.v2") {
+    return integrationErrorResponse("unsupported_schema_version", 400);
+  }
+  if (schema_version === "employee.v1" && source_system_key && source_system_key !== "watchman_launch") {
+    return integrationErrorResponse("invalid_source_system_key", 400);
+  }
+  if (schema_version === "employee.v2" && source_system_key !== "watchman_hr") {
+    return integrationErrorResponse("invalid_source_system_key", 400);
   }
 
   const dedupeKey = crypto
     .createHash("sha256")
-    .update(`watchman_launch:employee:${source_record_id}:${JSON.stringify(employee)}`)
+    .update(`${source_system_key ?? "watchman_launch"}:employee:${source_record_id}:${JSON.stringify(employee)}`)
     .digest("hex");
 
   try {
@@ -49,7 +62,7 @@ export async function POST(req: NextRequest) {
         {
           tenant_id,
           entity_id:         entity_id ?? null,
-          source_system_key: "watchman_launch",
+          source_system_key: source_system_key ?? "watchman_launch",
           source_record_id,
           dedupe_key:        dedupeKey,
           payload_json:      employee,
