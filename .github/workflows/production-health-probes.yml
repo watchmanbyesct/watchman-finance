@@ -1,0 +1,48 @@
+# Synthetic probes for Watchman Finance production (complements synthetic-live-probe.yml).
+# Liveness: GET /api/health — Readiness: GET /api/health/ready (fails HTTP on 503; requires route deployed).
+# Liveness jq accepts legacy payload or `{ kind:"liveness", status:"ok" }`.
+#
+# Repository variable (optional): WATCHMAN_FINANCE_PRODUCTION_URL
+# Default: https://watchman-finance.vercel.app
+# Secrets (optional): VERCEL_DEPLOYMENT_PROTECTION_BYPASS, WATCHMAN_ALERT_WEBHOOK
+
+name: Production health probes
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/10 * * * *"
+
+jobs:
+  probes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Liveness and readiness (Finance)
+        env:
+          FIN_URL: ${{ vars.WATCHMAN_FINANCE_PRODUCTION_URL }}
+          VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_DEPLOYMENT_PROTECTION_BYPASS }}
+        run: |
+          set -euo pipefail
+          BASE="${FIN_URL:-https://watchman-finance.vercel.app}"
+          echo "Probing BASE=$BASE"
+          extra=()
+          if [ -n "${VERCEL_PROTECTION_BYPASS:-}" ]; then
+            extra+=( -H "x-vercel-protection-bypass: ${VERCEL_PROTECTION_BYPASS}" )
+          fi
+          curl -fsS "${extra[@]}" "${BASE%/}/api/health" | jq -e '((.kind == "liveness" and .status == "ok") or (.status == "ok" and .service == "watchman-finance"))'
+          curl -fsS "${extra[@]}" "${BASE%/}/api/health/ready" | jq -e '.kind == "readiness" and .status == "ok"'
+
+      - name: Notify alert webhook on failure
+        if: ${{ failure() }}
+        env:
+          WATCHMAN_ALERT_WEBHOOK: ${{ secrets.WATCHMAN_ALERT_WEBHOOK }}
+        run: |
+          if [ -z "${WATCHMAN_ALERT_WEBHOOK:-}" ]; then
+            echo "WATCHMAN_ALERT_WEBHOOK unset; skipping alert."
+            exit 0
+          fi
+          MSG="Watchman Finance production health probes failed in ${GITHUB_REPOSITORY}. Run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          curl -sS -X POST "$WATCHMAN_ALERT_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "{\"text\":\"${MSG}\"}" || true
