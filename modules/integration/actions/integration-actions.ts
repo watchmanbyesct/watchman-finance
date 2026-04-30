@@ -12,6 +12,11 @@ import { createSupabaseAdminClient } from "@/lib/db/supabase-server";
 import { resolveRequestContext } from "@/lib/context/resolve-request-context";
 import { requirePermission, requireEntityScope } from "@/lib/permissions/require-permission";
 import { writeAuditLog } from "@/lib/audit/write-audit-log";
+import { normalizeEmployeePayloadForStaging } from "@/lib/integration/employee-event-normalize";
+import {
+  mapToFinanceEmploymentStatus,
+  resolvePromotionPersonFields,
+} from "@/lib/integration/staged-employee-promotion-fields";
 import { mapErrorToResult, type ActionResult } from "@/lib/errors/app-error";
 
 const PromoteStagedEmployeeSchema = z.object({
@@ -35,7 +40,9 @@ export async function promoteStagedEmployee(
 
     const { data: staged, error: fetchErr } = await admin
       .from("staged_employees")
-      .select("id, entity_id, source_record_id, payload_json, validation_status")
+      .select(
+        "id, entity_id, source_record_id, source_system_key, payload_json, normalized_json, validation_status"
+      )
       .eq("id", parsed.stagedEmployeeId)
       .eq("tenant_id", parsed.tenantId)
       .single();
@@ -49,16 +56,33 @@ export async function promoteStagedEmployee(
     }
 
     const payload = staged.payload_json as Record<string, unknown>;
-    const legalFirstName = String(payload.legal_first_name ?? payload.first_name ?? "").trim();
-    const legalLastName = String(payload.legal_last_name ?? payload.last_name ?? "").trim();
+    const normalized =
+      staged.normalized_json !== null &&
+      staged.normalized_json !== undefined &&
+      typeof staged.normalized_json === "object" &&
+      !Array.isArray(staged.normalized_json)
+        ? (staged.normalized_json as Record<string, unknown>)
+        : null;
 
-    if (!legalFirstName || !legalLastName) {
+    const names = resolvePromotionPersonFields({
+      payload,
+      normalized,
+    });
+
+    if (!names) {
       return {
         success: false,
         message: "Staging payload is missing legal first and last name.",
         errors: [{ code: "validation_failed", message: "missing_name" }],
       };
     }
+
+    const sourceSystemKey = String(staged.source_system_key ?? "").trim() || "watchman_launch";
+
+    const employmentStatus = mapToFinanceEmploymentStatus({
+      normalized,
+      payload,
+    });
 
     if (staged.entity_id) {
       requireEntityScope(ctx, staged.entity_id);
@@ -68,15 +92,15 @@ export async function promoteStagedEmployee(
       tenant_id:           parsed.tenantId,
       entity_id:            staged.entity_id,
       person_type:          "employee",
-      legal_first_name:     legalFirstName,
-      legal_last_name:      legalLastName,
-      middle_name:          (payload.middle_name as string | undefined) ?? null,
-      preferred_name:       (payload.preferred_name as string | undefined) ?? null,
-      email:                (payload.email as string | undefined) ?? null,
-      phone:                (payload.phone as string | undefined) ?? null,
-      employment_status:    String(payload.employment_status ?? "active"),
-      hire_date:            (payload.hire_date as string | undefined) ?? null,
-      source_system_key:    "watchman_launch",
+      legal_first_name:     names.legalFirstName,
+      legal_last_name:      names.legalLastName,
+      middle_name:          names.middleName ?? null,
+      preferred_name:       names.preferredName ?? null,
+      email:                names.email ?? null,
+      phone:                names.phone ?? null,
+      employment_status:    employmentStatus,
+      hire_date:            names.hireDate ?? null,
+      source_system_key:    sourceSystemKey,
       source_record_id:     staged.source_record_id,
     };
 
@@ -84,7 +108,7 @@ export async function promoteStagedEmployee(
       .from("finance_people")
       .select("id")
       .eq("tenant_id", parsed.tenantId)
-      .eq("source_system_key", "watchman_launch")
+      .eq("source_system_key", sourceSystemKey)
       .eq("source_record_id", staged.source_record_id)
       .maybeSingle();
 
@@ -135,7 +159,7 @@ export async function promoteStagedEmployee(
       {
         tenant_id:           parsed.tenantId,
         entity_id:           staged.entity_id,
-        source_system_key:   "watchman_launch",
+        source_system_key:   sourceSystemKey,
         source_record_type:  "employee",
         source_record_id:    staged.source_record_id,
         target_table:        "finance_people",
@@ -198,9 +222,22 @@ export async function stageManualStagedEmployee(
       employment_status: "active",
     };
 
+    const employeeForDedupeAndCanonical = {
+      employee_id: v.sourceRecordId,
+      first_name: v.legalFirstName,
+      last_name: v.legalLastName,
+      email: v.email ?? null,
+      roles: [],
+    };
+
     const dedupeKey = createHash("sha256")
       .update(`watchman_launch:employee:${v.sourceRecordId}:${JSON.stringify(employee)}`)
       .digest("hex");
+
+    const normalizedJson = normalizeEmployeePayloadForStaging(
+      "employee.v1",
+      employeeForDedupeAndCanonical as Record<string, unknown>
+    );
 
     const admin = createSupabaseAdminClient();
     const { data, error } = await admin
@@ -213,7 +250,7 @@ export async function stageManualStagedEmployee(
           source_record_id: v.sourceRecordId,
           dedupe_key: dedupeKey,
           payload_json: employee,
-          normalized_json: {},
+          normalized_json: normalizedJson,
           validation_status: "pending",
           correlation_id: randomUUID(),
         },
